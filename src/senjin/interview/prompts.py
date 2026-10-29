@@ -89,8 +89,8 @@ NOTES = {
         "Do not repeat an earlier question."
     ),
     "qa_open": (
-        "Tell the candidate the technical part is finished and invite any questions they have "
-        "about the role, team or process. Ask nothing else."
+        "Thank the candidate for their answers, say the technical part is finished, and invite "
+        "any questions they have about the role, team or process. Ask nothing else."
     ),
     "qa_answer": (
         "Answer their question in one to three sentences, using only facts written in the job "

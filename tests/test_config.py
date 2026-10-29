@@ -14,7 +14,7 @@ def test_defaults_are_five_questions_split_two_and_three():
         Phase.INTRO: 1,
         Phase.RESUME_DIVE: 2,
         Phase.TECHNICAL: 3,
-        Phase.CANDIDATE_QA: 3,
+        Phase.CANDIDATE_QA: 4,  # invitation + 3 answers
         Phase.SIGNOFF: 1,
     }
 
@@ -114,7 +114,7 @@ async def test_interview_asks_exactly_n_questions_then_hands_over_to_candidate(n
     questions = spoken_by_phase["resume_dive"] + spoken_by_phase["technical"]
     assert questions == n
     assert spoken_by_phase["intro"] == 1 and spoken_by_phase["signoff"] == 1
-    assert spoken_by_phase["candidate_qa"] <= cfg.qa_turns
+    assert spoken_by_phase["candidate_qa"] <= cfg.qa_turns + 1
 
 
 def test_voice_timing_defaults_and_overrides():

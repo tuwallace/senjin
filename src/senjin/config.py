@@ -2,7 +2,8 @@
 
 SENJIN_MAX_QUESTIONS     questions asked in the background + technical parts (default 5, 2 to 30)
 SENJIN_RESUME_QUESTIONS  how many of those are about the resume (default: 40%, at least 1)
-SENJIN_QA_TURNS          replies reserved for the candidate's own questions (default 3, 1 to 10)
+SENJIN_QA_TURNS          answers reserved for the candidate's own questions (default 3, 1 to 10);
+                         the invitation to ask comes on top
 SENJIN_MAX_MINUTES       time box for the whole interview (default 45)
 SENJIN_IDLE_SECONDS      silence before "Are you still there?" (default 25, 0 turns it off)
 SENJIN_SILENCE_MS        silence that ends the candidate's turn (default 700, 200 to 3000)
@@ -118,7 +119,7 @@ class InterviewConfig:
             Phase.INTRO: 1,
             Phase.RESUME_DIVE: self.resume,
             Phase.TECHNICAL: self.technical,
-            Phase.CANDIDATE_QA: self.qa_turns,
+            Phase.CANDIDATE_QA: self.qa_turns + 1,  # the invitation itself is not an answer
             Phase.SIGNOFF: 1,
         }
         return {p: Budget(turns[p], DEFAULT_BUDGETS[p].max_seconds) for p in Phase}
@@ -129,6 +130,6 @@ class InterviewConfig:
     def describe(self) -> str:
         return (
             f"Interview plan: {self.max_questions} questions ({self.resume} background + "
-            f"{self.technical} technical), then up to {self.qa_turns} replies to the candidate, "
-            f"within {self.max_minutes:g} minutes."
+            f"{self.technical} technical), then up to {self.qa_turns} answers to the "
+            f"candidate's questions, within {self.max_minutes:g} minutes."
         )
