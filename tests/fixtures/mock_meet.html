@@ -1,0 +1,38 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Mock Meet</title></head>
+<body>
+<!-- Mimics the Meet labels we assume (see senjin/meet/selectors.py). It proves our flow logic,
+     not that real Meet looks like this. -->
+<div id="prejoin">
+  <input aria-label="Your name" id="name">
+  <button id="cam" aria-label="Turn off camera (ctrl + e)">cam</button>
+  <button id="mic" aria-label="Turn on microphone (ctrl + d)">mic</button>
+  <button id="join">Ask to join</button>
+</div>
+<div id="call" hidden>
+  <button aria-label="Show everyone"><span id="count">1</span></button>
+  <button id="leave" aria-label="Leave call">Leave</button>
+</div>
+<div id="denied" hidden>Someone in the meeting denied your request to join</div>
+<script>
+const q = new URLSearchParams(location.search);
+const clicked = [];
+window.__clicked = clicked;
+for (const id of ["cam", "mic"]) {
+  document.getElementById(id).onclick = () => { clicked.push(id); };
+}
+document.getElementById("join").onclick = () => {
+  clicked.push("join");
+  window.__name = document.getElementById("name").value;
+  document.getElementById("prejoin").hidden = true;
+  setTimeout(() => {
+    if (q.get("deny")) { document.getElementById("denied").hidden = false; return; }
+    document.getElementById("call").hidden = false;
+    setTimeout(() => { document.getElementById("count").textContent = "2"; }, 300);
+  }, 300);
+};
+document.getElementById("leave").onclick = () => {
+  document.getElementById("call").hidden = true;
+};
+</script>
+</body></html>

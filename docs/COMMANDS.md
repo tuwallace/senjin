@@ -11,7 +11,7 @@ Phases marked **planned** have no code yet; their commands are the intended ones
 | 3 Assessment | done | `v0.3` |
 | 4 Anthropic dataset | planned | `v0.4` |
 | 5 Voice loop | done | `v0.5` |
-| 6 Google Meet bot | planned | `v0.6` |
+| 6 Google Meet bot | built, not run against real Meet | `v0.6` |
 | 7 Hardening | planned | `v1.0` |
 
 ## Prerequisites (once)
@@ -233,14 +233,57 @@ Barge-in: if you speak for about 300 ms while Sen is talking, playback stops at 
 
 Tests (no audio hardware or models needed): `uv run pytest tests/test_voice.py`
 
-## Phase 6: Google Meet bot (planned)
+## Phase 6: Google Meet bot
+
+Status: built and tested against a mock Meet page and Chrome's fake audio devices. **Not yet run against a real Meet or real BlackHole devices**; do the steps below in order, and expect to adjust `src/senjin/meet/selectors.py` on first contact with real Meet.
+
+How audio flows: Chrome's microphone is forced to `BlackHole 2ch`, and the voice loop plays Piper speech into it. Chrome's speaker is forced to `BlackHole 16ch`, and the voice loop records the candidate from it. The bot's own voice never reaches the recording, so there is no echo. You will not hear the call yourself; join it from another device or account to listen.
+
+1. Install the virtual audio drivers (needs your password; reboot or log out and in if macOS does not list them):
 
 ```bash
-uv run senjin-meet login                             # one-time sign in of the bot Google account, saves a browser profile
-uv run senjin-meet join "https://meet.google.com/xxx-xxxx-xxx"
+brew install --cask blackhole-2ch blackhole-16ch
 ```
 
-Audio devices (BlackHole) must be installed first; see Phase 0.
+2. Confirm both devices are visible:
+
+```bash
+uv run senjin-meet devices
+```
+
+3. Prove the audio bridge works, with no Google account or meeting (opens a Chrome window, speaks, listens, prints PASS or FAIL in each direction):
+
+```bash
+uv run senjin-meet selftest
+```
+
+4. Sign in the Google account the bot should use. A Chrome window opens and you type the credentials yourself; the session is saved in `data/meet_profile/` (git-ignored). A dedicated account is recommended:
+
+```bash
+uv run senjin-meet login
+```
+
+5. Create a Meet from another account or device (the host), then send the bot in. The host must admit the bot from the lobby:
+
+```bash
+uv run senjin-meet run "https://meet.google.com/xxx-xxxx-xxx"
+```
+
+Options:
+
+```bash
+uv run senjin-meet run URL --wait-candidate 120      # seconds to wait for a second participant before starting
+uv run senjin-meet run URL --admit-timeout 600       # seconds to wait in the lobby
+uv run senjin-meet run URL --silence-ms 600          # end-of-turn silence
+uv run senjin-meet run URL --model llama3.1:8b-instruct-q8_0 --stt-model ggml-base.en.bin
+uv run senjin-meet run URL --speak-device "BlackHole 2ch" --hear-device "BlackHole 16ch"
+```
+
+The bot says it is an AI and that the call is transcribed in its first sentence. Only join meetings you host or have permission to join. The run ends after the sign-off or when the call ends; the transcript is `data/sessions/meet-<timestamp>.jsonl` and can be scored with `senjin-assess`.
+
+Tests (Chrome required; they are skipped when it is missing): `uv run pytest tests/test_meet.py`
+
+If joining fails: check `src/senjin/meet/selectors.py` first (Meet changes its labels), then run with a visible window (the default) and watch where it stops.
 
 ## Phase 7: Hardening (planned)
 

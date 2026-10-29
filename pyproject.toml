@@ -15,6 +15,7 @@ dependencies = [
     "sounddevice>=0.5.6",
     "onnxruntime>=1.31.1",
     "piper-tts>=1.8.0",
+    "playwright>=1.64.1",
 ]
 
 [dependency-groups]
@@ -34,6 +35,9 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.per-file-ignores]
+"src/senjin/meet/browser_js.py" = ["E501"]  # embedded JavaScript
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
@@ -45,3 +49,4 @@ senjin-assess = "senjin.assess.cli:main"
 senjin-data = "senjin.eval.data_cli:main"
 senjin-sim = "senjin.eval.sim:main"
 senjin-voice = "senjin.audio.cli:main"
+senjin-meet = "senjin.meet.cli:main"

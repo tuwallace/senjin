@@ -10,15 +10,17 @@ import numpy as np
 from senjin.audio.vad import FRAME, RATE
 
 
-async def mic_frames(device: int | str | None = None) -> AsyncIterator[np.ndarray]:
-    """Yield 32 ms mono float32 frames at 16 kHz from the microphone."""
+async def mic_frames(
+    device: int | str | None = None, channels: int = 1
+) -> AsyncIterator[np.ndarray]:
+    """Yield 32 ms mono float32 frames at 16 kHz; multi-channel devices are averaged."""
     import sounddevice as sd
 
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[np.ndarray] = asyncio.Queue(maxsize=200)
 
     def callback(indata, frames, time_info, status) -> None:
-        frame = indata[:, 0].copy()
+        frame = indata[:, 0].copy() if channels == 1 else indata.mean(axis=1)
         loop.call_soon_threadsafe(_put, frame)
 
     def _put(frame: np.ndarray) -> None:
@@ -27,7 +29,7 @@ async def mic_frames(device: int | str | None = None) -> AsyncIterator[np.ndarra
         queue.put_nowait(frame)
 
     with sd.InputStream(
-        samplerate=RATE, channels=1, dtype="float32", blocksize=FRAME, device=device,
+        samplerate=RATE, channels=channels, dtype="float32", blocksize=FRAME, device=device,
         callback=callback,
     ):  # fmt: skip
         while True:
@@ -37,17 +39,20 @@ async def mic_frames(device: int | str | None = None) -> AsyncIterator[np.ndarra
 class Player:
     """Plays queued clips; stop() cuts audio immediately. Tracks which clips began playing."""
 
-    def __init__(self, sample_rate: int, device: int | str | None = None) -> None:
+    def __init__(
+        self, sample_rate: int, device: int | str | None = None, channels: int = 1
+    ) -> None:
         import sounddevice as sd
 
         self.sample_rate = sample_rate
+        self._channels = channels
         self._clips: deque[tuple[str, np.ndarray]] = deque()
         self._current: tuple[str, np.ndarray, int] | None = None
         self._lock = threading.Lock()
         self.started: list[str] = []
         self.first_sample_at: float | None = None
         self._stream = sd.OutputStream(
-            samplerate=sample_rate, channels=1, dtype="int16", device=device,
+            samplerate=sample_rate, channels=channels, dtype="int16", device=device,
             callback=self._callback,
         )  # fmt: skip
         self._stream.start()
@@ -84,8 +89,7 @@ class Player:
     def _callback(self, outdata, frames, time_info, status) -> None:
         import time
 
-        out = outdata[:, 0]
-        out[:] = 0
+        out = np.zeros(frames, dtype=np.int16)
         filled = 0
         with self._lock:
             while filled < frames:
@@ -103,6 +107,7 @@ class Player:
                 filled += n
                 pos += n
                 self._current = None if pos >= len(audio) else (tag, audio, pos)
+        outdata[:] = out[:, None]  # same signal on every channel
 
 
 class SilentPlayer:
