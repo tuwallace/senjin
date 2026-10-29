@@ -261,3 +261,33 @@ async def test_qa_note_forbids_inventing_facts():
     from senjin.interview.prompts import NOTES
 
     assert "never invent" in NOTES["qa_answer"] and "salary" in NOTES["qa_answer"]
+
+
+async def test_interrupted_unspoken_reply_does_not_use_up_a_question_or_a_turn():
+    llm = FakeLLM([])
+    tools = OrchestratedTools()
+    session = orchestrated(llm, tools, technical=6)
+    await collect(session.open())
+    await collect(session.respond("ready"))
+    await collect(session.respond("my project"))  # technical: the question is asked
+    await collect(session.respond("answer 1"))  # follow-up 1 is asked
+    turns = session.state.turns_in_phase
+    assert "FU-one?" in last_user(llm.calls[-1])
+    session.interrupt("")  # the candidate cut in before any of it was spoken
+    assert session.state.turns_in_phase == turns - 1
+    assert session.history[-1]["role"] == "user"
+    await collect(session.respond("answer 1 again"))
+    assert "FU-one?" in last_user(llm.calls[-1])  # asked again, not skipped
+    session.interrupt("Okay, so")  # partly spoken: it counts
+    assert session.history[-1]["content"] == "Okay, so"
+
+
+async def test_empty_model_reply_is_not_counted_as_a_turn():
+    class Silent(FakeLLM):
+        async def stream(self, messages, tools=None):
+            return
+            yield
+
+    session = InterviewSession(Silent([]))
+    await collect(session.open())
+    assert session.state.turns_in_phase == 0

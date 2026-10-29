@@ -60,6 +60,7 @@ class InterviewSession:
         self._question: dict | None = None
         self._followups: list[str] = []
         self._question_new = False
+        self._undo_note: Callable[[], None] | None = None  # re-arms the last note if unspoken
         self.exemplars = exemplars
         self.llm = llm
         self.tools = tools
@@ -95,6 +96,7 @@ class InterviewSession:
         examples: list[str] = []
         if self.exemplars:
             examples = await self.exemplars.examples(candidate_text, self.state.phase)
+        self._undo_note = None
         note = await self._turn_note() if self.prefetch else None
         async for chunk in self._reply(examples, note):
             yield chunk
@@ -141,18 +143,25 @@ class InterviewSession:
         else:  # bank exhausted or lookup failed
             self._question, self._followups, self._question_new = None, [], False
 
+    def _rearm_question(self) -> None:
+        self._question_new = True
+
     async def _turn_note(self) -> str | None:
         """What the model must do this turn, decided by code rather than by the model."""
         phase = self.state.phase
         if phase == Phase.TECHNICAL:
             if self._question_new and self._question:
                 self._question_new = False
+                self._undo_note = self._rearm_question
                 return NOTES["ask"].format(q=self._question["prompt"])
             if self._followups:
-                return NOTES["follow_up"].format(fu=self._followups.pop(0))
+                follow_up = self._followups.pop(0)
+                self._undo_note = lambda: self._followups.insert(0, follow_up)
+                return NOTES["follow_up"].format(fu=follow_up)
             self._absorb_question(await self._fetch("get_next_technical_question"))
             if self._question_new and self._question:
                 self._question_new = False
+                self._undo_note = self._rearm_question
                 return NOTES["next_question"].format(q=self._question["prompt"])
             return NOTES["probe"]
         if phase == Phase.CANDIDATE_QA:
@@ -205,7 +214,7 @@ class InterviewSession:
             text = "".join(parts).strip()
             if text:
                 self._record("assistant", text)
-            self.state.record_interviewer_turn()
+                self.state.record_interviewer_turn()
             # A goodbye that was cut off must not end the interview as if it had been said.
             if self.state.phase == Phase.SIGNOFF and completed:
                 self.state.finished = True
@@ -216,8 +225,11 @@ class InterviewSession:
         if last and last["role"] == "assistant" and not last.get("tool_calls"):
             if spoken.strip():
                 last["content"] = spoken.strip()
-            else:
+            else:  # nothing was said: the turn, and the question it carried, are not used up
                 self.history.pop()
+                self.state.turns_in_phase = max(0, self.state.turns_in_phase - 1)
+                if self._undo_note:
+                    self._undo_note()
         if self.log:
             self.log.append("interrupt", spoken.strip(), self.state.phase.value)
 
