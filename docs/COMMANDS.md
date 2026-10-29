@@ -10,7 +10,7 @@ Phases marked **planned** have no code yet; their commands are the intended ones
 | 2 MCP context | done | `v0.2` |
 | 3 Assessment | done | `v0.3` |
 | 4 Anthropic dataset | planned | `v0.4` |
-| 5 Voice loop | planned | `v0.5` |
+| 5 Voice loop | done | `v0.5` |
 | 6 Google Meet bot | planned | `v0.6` |
 | 7 Hardening | planned | `v1.0` |
 
@@ -188,12 +188,50 @@ Tests: `uv run pytest tests/test_dataset.py`
 
 Attribution: Anthropic Interviewer transcripts, https://huggingface.co/datasets/Anthropic/AnthropicInterviewer. Raw data and exemplars stay in `data/` and are not committed.
 
-## Phase 5: Voice loop on the laptop (planned)
+## Phase 5: Voice loop on the laptop
+
+Stack: Silero VAD (ONNX) -> whisper.cpp server (Metal) -> Ollama -> Piper TTS -> speakers, with barge-in.
+
+One-time setup (downloads the Silero VAD and a Piper voice, about 65 MB, into `data/models/`; whisper models are read from `~/.cache/whisper-models/`):
 
 ```bash
-uv run senjin-voice --stt whisper.cpp --tts piper    # spoken interview with the mic and speakers (use headphones)
-uv run senjin-voice --latency-report                 # per-stage timings
+uv run senjin-voice setup
+uv run senjin-voice devices          # list microphones and speakers
 ```
+
+Check the audio stack without a microphone (speaks a sentence, transcribes it back, runs the VAD):
+
+```bash
+uv run senjin-voice check
+uv run senjin-voice check --stt-model ggml-large-v3-turbo-q5_0.bin   # slower, more accurate
+uv run senjin-voice check --tts say                                  # macOS voice instead of Piper
+```
+
+Run the full pipeline with synthetic candidate speech and no microphone or speaker (real VAD, STT, LLM, TTS; prints a latency summary):
+
+```bash
+uv run senjin-voice simulate
+uv run senjin-voice simulate --turns 3 --silence-ms 600
+```
+
+Hold a spoken interview. Use headphones, or the interviewer will hear itself; macOS asks for microphone permission the first time:
+
+```bash
+uv run senjin-voice run
+uv run senjin-voice run --silence-ms 600        # end your turn after 0.6 s of silence (default 0.8 s)
+uv run senjin-voice run --no-barge-in           # speakers instead of headphones: ignore the mic while Sen talks
+uv run senjin-voice run --model llama3.1:8b-instruct-q8_0 --stt-model ggml-base.en.bin
+```
+
+Stop with Ctrl-C. Outputs go to `data/sessions/voice-<timestamp>.jsonl` (transcript) and `.latency.jsonl` (per-turn timings). Summarize a latency file:
+
+```bash
+uv run senjin-voice report data/sessions/voice-<timestamp>.latency.jsonl
+```
+
+Barge-in: if you speak for about 300 ms while Sen is talking, playback stops at once and the transcript keeps only the words Sen actually said (an `interrupt` row records them).
+
+Tests (no audio hardware or models needed): `uv run pytest tests/test_voice.py`
 
 ## Phase 6: Google Meet bot (planned)
 

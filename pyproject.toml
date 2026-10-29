@@ -11,6 +11,10 @@ dependencies = [
     "ollama>=0.4",
     "mcp>=1.2",
     "pyyaml>=6.0.3",
+    "numpy>=2.5.4",
+    "sounddevice>=0.5.6",
+    "onnxruntime>=1.31.1",
+    "piper-tts>=1.8.0",
 ]
 
 [dependency-groups]
@@ -40,3 +44,4 @@ senjin-chat = "senjin.cli:main"
 senjin-assess = "senjin.assess.cli:main"
 senjin-data = "senjin.eval.data_cli:main"
 senjin-sim = "senjin.eval.sim:main"
+senjin-voice = "senjin.audio.cli:main"

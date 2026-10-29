@@ -41,7 +41,7 @@ async def run_model(model: str, tools: list[dict]) -> None:
     ttft: list[float] = []
     for phase, history, expected in SCENARIOS:
         for _ in range(REPEATS):
-            instruction = phase_message(phase, entering=False)
+            instruction = phase_message(phase)
             system = {
                 "role": "system",
                 "content": f"{SYSTEM_PROMPT}\nCurrent instruction: {instruction}",

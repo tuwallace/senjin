@@ -62,18 +62,21 @@ async def test_time_budget_advances_phase():
     assert session.state.phase == Phase.RESUME_DIVE
 
 
-async def test_prompt_shape_and_transition_note():
+async def test_prompt_shape_and_stable_system_prefix_within_a_phase():
     llm = FakeLLM([])
-    session = InterviewSession(llm, state=InterviewState(budgets=one_turn_budgets()))
+    budgets = one_turn_budgets()
+    budgets[Phase.RESUME_DIVE] = Budget(max_turns=2, max_seconds=1e9)
+    session = InterviewSession(llm, state=InterviewState(budgets=budgets))
     await collect(session.open())
-    await collect(session.respond("ready"))
-    first, second = llm.calls
+    await collect(session.respond("ready"))  # -> resume_dive
+    await collect(session.respond("I built a ledger"))  # still resume_dive
+    first, second, third = llm.calls
     assert first[0]["role"] == "system" and "Sen" in first[0]["content"]
     assert first[-1]["role"] == "user"
     assert [m["role"] for m in second].count("system") == 1
-    assert "Transition" not in first[0]["content"]
-    assert "Transition" in second[0]["content"]
-    assert second[-1] == {"role": "user", "content": "ready"}
+    assert first[0]["content"] != second[0]["content"]  # phase changed
+    assert second[0]["content"] == third[0]["content"]  # same phase: cacheable prefix
+    assert third[-1] == {"role": "user", "content": "I built a ledger"}
 
 
 async def test_signoff_finishes_session():
@@ -131,3 +134,38 @@ async def test_tool_loop_is_bounded():
     await collect(session.open())
     assert len(llm.calls) == 4  # initial + 3 tool rounds
     assert llm.tools_seen[-1] is None  # last round forces a spoken reply
+
+
+class PrefetchTools(StubTools):
+    async def call(self, name, arguments):
+        self.calls.append((name, arguments))
+        return f"RESULT:{name}"
+
+
+async def test_prefetch_runs_tool_on_phase_entry_and_adapts_instruction():
+    tools = PrefetchTools()
+    llm = FakeLLM([])
+    session = InterviewSession(
+        llm, state=InterviewState(budgets=one_turn_budgets()), tools=tools, prefetch=True
+    )
+    await collect(session.open())
+    assert tools.calls == []  # intro needs nothing
+    await collect(session.respond("ready"))
+    assert tools.calls == [("get_candidate_resume", {})]
+    # the model already sees the result and is told not to fetch it
+    messages = llm.calls[-1]
+    assert any(
+        m["role"] == "tool" and m["content"] == "RESULT:get_candidate_resume" for m in messages
+    )
+    assert "already fetched" in messages[0]["content"]
+    assert len(llm.calls) == 2  # no extra LLM round for the tool call
+
+
+async def test_prefetch_off_by_default():
+    tools = PrefetchTools()
+    session = InterviewSession(
+        FakeLLM([]), state=InterviewState(budgets=one_turn_budgets()), tools=tools
+    )
+    await collect(session.open())
+    await collect(session.respond("ready"))
+    assert tools.calls == []

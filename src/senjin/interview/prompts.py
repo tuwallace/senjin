@@ -47,12 +47,24 @@ PHASE_INSTRUCTIONS: dict[Phase, str] = {
     ),
 }
 
-TRANSITION_NOTE = "Transition: briefly wrap up the previous topic, then begin this phase."
+PREFETCHED_INSTRUCTIONS: dict[Phase, str] = {
+    Phase.RESUME_DIVE: (
+        "Phase: background. The candidate's resume was already fetched above. Ask about a "
+        "specific project from it and probe for their own role, decisions, trade-offs, "
+        "and what they would change."
+    ),
+    Phase.TECHNICAL: (
+        "Phase: technical. The next question was already fetched above. Ask exactly that "
+        "question to the candidate in your own spoken words, then stop. Use its follow-ups "
+        "when needed; call get_next_technical_question again for each new topic. "
+        "Let them think aloud. Probe reasoning, edge cases, and complexity with follow-ups."
+    ),
+}
 
 
-def phase_message(phase: Phase, *, entering: bool) -> str:
-    text = PHASE_INSTRUCTIONS[phase]
-    return f"{TRANSITION_NOTE} {text}" if entering and phase != Phase.INTRO else text
+def phase_message(phase: Phase, *, prefetched: bool = False) -> str:
+    """Stable within a phase on purpose: an unchanged prompt prefix lets Ollama reuse its cache."""
+    return (PREFETCHED_INSTRUCTIONS.get(phase) if prefetched else None) or PHASE_INSTRUCTIONS[phase]
 
 
 KICKOFF = "[The call has connected and the candidate is present. Begin the interview.]"

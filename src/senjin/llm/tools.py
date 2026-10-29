@@ -54,3 +54,14 @@ async def open_mcp_tools(
             for t in listed.tools
         ]
         yield McpToolRunner(session, tools)
+
+
+class FilteredTools:
+    """Hide some tools from the model (they stay callable by the orchestrator)."""
+
+    def __init__(self, inner: ToolRunner, exclude: set[str]) -> None:
+        self._inner = inner
+        self.tools = [t for t in inner.tools if t["function"]["name"] not in exclude]
+
+    async def call(self, name: str, arguments: dict[str, Any]) -> str:
+        return await self._inner.call(name, arguments)

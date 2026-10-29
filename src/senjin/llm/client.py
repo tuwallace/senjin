@@ -50,6 +50,7 @@ class OllamaClient:
             tools=tools or None,
             stream=True,
             think=False,
+            keep_alive="30m",  # avoid multi-second reloads between turns
             options={"temperature": self.temperature},
         )
         async for chunk in response:
