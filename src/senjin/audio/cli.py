@@ -227,7 +227,7 @@ def main() -> None:
     run_p.add_argument(
         "--no-barge-in", action="store_true", help="use with speakers, not headphones"
     )
-    run_p.add_argument("--silence-ms", type=int, help="env SENJIN_SILENCE_MS, default 700")
+    run_p.add_argument("--silence-ms", type=int, help="env SENJIN_SILENCE_MS, default 1000")
     run_p.add_argument("--filler-ms", type=int, help="env SENJIN_FILLER_MS, default 1100 (0 = off)")
     run_p.add_argument(
         "--max-questions", type=int, help="questions to ask (env SENJIN_MAX_QUESTIONS, default 5)"

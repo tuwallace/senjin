@@ -34,7 +34,7 @@ By default Senjin asks 5 interview questions: 2 about the candidate's background
 | `SENJIN_RESUME_QUESTIONS` | 40% of the above, at least 1 | how many of those are about the resume |
 | `SENJIN_MAX_MINUTES` | 45 | time box for the whole interview |
 | `SENJIN_IDLE_SECONDS` | 25 | silence before "Are you still there?" (0 = off) |
-| `SENJIN_SILENCE_MS` | 700 | silence that ends the candidate's turn (200 to 3000); lower is snappier but may cut people off |
+| `SENJIN_SILENCE_MS` | 1000 | silence that ends the candidate's turn (200 to 3000); lower is snappier but may cut people off |
 | `SENJIN_FILLER_MS` | 1100 | if no reply has started this long after the candidate stops, play a short "Okay, right." or "I see." (picked at random) (0 = off) |
 
 ```bash

@@ -121,7 +121,7 @@ async def test_interview_asks_exactly_n_questions_then_hands_over_to_candidate(n
 
 def test_voice_timing_defaults_and_overrides():
     cfg = InterviewConfig.from_env({})
-    assert (cfg.silence_ms, cfg.filler_ms) == (700, 1100)
+    assert (cfg.silence_ms, cfg.filler_ms) == (1000, 1100)
     cfg = InterviewConfig.from_env({"SENJIN_SILENCE_MS": "500", "SENJIN_FILLER_MS": "0"})
     assert (cfg.silence_ms, cfg.filler_ms) == (500, 0)
     assert cfg.override(silence_ms=650, filler_ms=1200).silence_ms == 650

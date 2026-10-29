@@ -4,7 +4,7 @@ SENJIN_MAX_QUESTIONS     questions asked in the background + technical parts (de
 SENJIN_RESUME_QUESTIONS  how many of those are about the resume (default: 40%, at least 1)
 SENJIN_MAX_MINUTES       time box for the whole interview (default 45)
 SENJIN_IDLE_SECONDS      silence before "Are you still there?" (default 25, 0 turns it off)
-SENJIN_SILENCE_MS        silence that ends the candidate's turn (default 700, 200 to 3000)
+SENJIN_SILENCE_MS        silence that ends the candidate's turn (default 1000, 200 to 3000)
 SENJIN_FILLER_MS         play "Okay, right." or "I see." if no reply has started this long
                          after the candidate stops (default 1100, 0 turns it off)
 
@@ -58,7 +58,7 @@ class InterviewConfig:
     resume_questions: int | None = None  # None: derive from max_questions
     max_minutes: float = 45.0
     idle_seconds: float = 25.0
-    silence_ms: int = 700
+    silence_ms: int = 1000
     filler_ms: int = 1100
 
     @classmethod
@@ -73,7 +73,7 @@ class InterviewConfig:
             resume_questions=resume,
             max_minutes=_number(env, "SENJIN_MAX_MINUTES", 45, 1, 600),
             idle_seconds=_number(env, "SENJIN_IDLE_SECONDS", 25, 0, 3600),
-            silence_ms=int(_number(env, "SENJIN_SILENCE_MS", 700, 200, 3000)),
+            silence_ms=int(_number(env, "SENJIN_SILENCE_MS", 1000, 200, 3000)),
             filler_ms=int(_number(env, "SENJIN_FILLER_MS", 1100, 0, 10000)),
         )
 

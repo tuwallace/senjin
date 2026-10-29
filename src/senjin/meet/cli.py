@@ -63,7 +63,7 @@ def main() -> None:
     run.add_argument("--out", type=Path)
     run.add_argument("--admit-timeout", type=float, default=300)
     run.add_argument("--wait-candidate", type=float, default=600)
-    run.add_argument("--silence-ms", type=int, help="env SENJIN_SILENCE_MS, default 700")
+    run.add_argument("--silence-ms", type=int, help="env SENJIN_SILENCE_MS, default 1000")
     run.add_argument("--filler-ms", type=int, help="env SENJIN_FILLER_MS, default 1100 (0 = off)")
     run.add_argument("--max-questions", type=int, help="env SENJIN_MAX_QUESTIONS, default 5")
     run.add_argument("--max-minutes", type=float, help="env SENJIN_MAX_MINUTES, default 45")
