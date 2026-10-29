@@ -6,7 +6,7 @@ Local AI technical interviewer (Google Meet bot). Plan: `docs/ROADMAP.md`. Spec:
 - Setup: `uv sync`
 - Test: `uv run pytest`
 - Lint/format: `uv run ruff check . && uv run ruff format .`
-- MCP debug client: `ollmcp -s src/senjin/mcp_server/server.py -m qwen3:8b-16k`
+- MCP debug client (from repo root): `ollmcp -j examples/ollmcp-servers.json -m qwen3:8b-16k`
 
 ## Conventions
 - Python 3.12, `src/` layout, package `senjin`.

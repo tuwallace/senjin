@@ -1,19 +1,31 @@
 """Chat clients. The interviewer depends only on the `LLMClient` protocol."""
 
 from collections.abc import AsyncIterator
-from typing import Protocol
+from dataclasses import dataclass, field
+from typing import Any, Protocol
 
 import ollama
 
 DEFAULT_MODEL = "qwen3:8b-16k"
 DEFAULT_HOST = "http://localhost:11434"
 
-Message = dict[str, str]
+Message = dict[str, Any]
+
+
+@dataclass
+class ToolCall:
+    name: str
+    arguments: dict[str, Any] = field(default_factory=dict)
+
+
+Event = str | ToolCall
 
 
 class LLMClient(Protocol):
-    def stream(self, messages: list[Message]) -> AsyncIterator[str]:
-        """Yield the assistant reply as text chunks."""
+    def stream(
+        self, messages: list[Message], tools: list[dict] | None = None
+    ) -> AsyncIterator[Event]:
+        """Yield text chunks and tool calls as the model produces them."""
         ...
 
 
@@ -28,16 +40,20 @@ class OllamaClient:
         self.temperature = temperature
         self._client = ollama.AsyncClient(host=host)
 
-    async def stream(self, messages: list[Message]) -> AsyncIterator[str]:
+    async def stream(
+        self, messages: list[Message], tools: list[dict] | None = None
+    ) -> AsyncIterator[Event]:
         # think=False: qwen3 reasoning tokens would be spoken aloud later and add latency.
         response = await self._client.chat(
             model=self.model,
             messages=messages,
+            tools=tools or None,
             stream=True,
             think=False,
             options={"temperature": self.temperature},
         )
         async for chunk in response:
-            text = chunk.message.content
-            if text:
-                yield text
+            if chunk.message.content:
+                yield chunk.message.content
+            for call in chunk.message.tool_calls or []:
+                yield ToolCall(call.function.name, dict(call.function.arguments or {}))

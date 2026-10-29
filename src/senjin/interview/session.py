@@ -6,7 +6,10 @@ from collections.abc import AsyncIterator, Callable
 from senjin.interview.prompts import KICKOFF, SYSTEM_PROMPT, phase_message
 from senjin.interview.state import InterviewState
 from senjin.interview.transcript import TranscriptLog
-from senjin.llm.client import LLMClient, Message
+from senjin.llm.client import LLMClient, Message, ToolCall
+from senjin.llm.tools import ToolRunner
+
+MAX_TOOL_ROUNDS = 3
 
 
 class InterviewSession:
@@ -16,8 +19,10 @@ class InterviewSession:
         log: TranscriptLog | None = None,
         state: InterviewState | None = None,
         clock: Callable[[], float] = time.monotonic,
+        tools: ToolRunner | None = None,
     ) -> None:
         self.llm = llm
+        self.tools = tools
         self.log = log
         self.state = state or InterviewState()
         self.clock = clock
@@ -47,21 +52,49 @@ class InterviewSession:
     async def _reply(self) -> AsyncIterator[str]:
         # One system message: some chat templates (qwen) mishandle several or trailing ones.
         phase = phase_message(self.state.phase, entering=self._entering)
-        messages: list[Message] = [
-            {"role": "system", "content": f"{SYSTEM_PROMPT}\nCurrent instruction: {phase}"},
-            *self.history,
-        ]
-        if not self.history:
-            messages.append({"role": "user", "content": KICKOFF})
         self._entering = False
+        system = {"role": "system", "content": f"{SYSTEM_PROMPT}\nCurrent instruction: {phase}"}
+        tools = self.tools.tools if self.tools else None
         parts: list[str] = []
-        async for chunk in self.llm.stream(messages):
-            parts.append(chunk)
-            yield chunk
+        for _ in range(MAX_TOOL_ROUNDS + 1):
+            messages: list[Message] = [system, *self.history]
+            if not self.history:
+                messages.append({"role": "user", "content": KICKOFF})
+            calls: list[ToolCall] = []
+            async for event in self.llm.stream(messages, tools):
+                if isinstance(event, ToolCall):
+                    calls.append(event)
+                else:
+                    parts.append(event)
+                    yield event
+            if not calls or not self.tools:
+                break
+            await self._run_tools(calls)
+            tools = self.tools.tools if _ < MAX_TOOL_ROUNDS - 1 else None  # force a spoken reply
         self._record("assistant", "".join(parts).strip())
         self.state.record_interviewer_turn()
         if self.state.phase.value == "signoff":
             self.state.finished = True
+
+    async def _run_tools(self, calls: list[ToolCall]) -> None:
+        assert self.tools
+        self.history.append(
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {"function": {"name": c.name, "arguments": c.arguments}} for c in calls
+                ],
+            }
+        )
+        for call in calls:
+            try:
+                result = await self.tools.call(call.name, call.arguments)
+            except Exception as exc:  # a failed tool must not end the interview
+                result = f"ERROR: {exc}"
+            self.history.append({"role": "tool", "tool_name": call.name, "content": result})
+            if self.log:
+                self.log.append("tool", f"{call.name}({call.arguments}) -> {result[:500]}", "")
 
     def _record(self, role: str, text: str) -> None:
         self.history.append({"role": role, "content": text})

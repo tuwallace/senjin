@@ -83,3 +83,51 @@ async def test_signoff_finishes_session():
         await collect(session.respond("x"))
     assert session.finished
     assert [m["role"] for m in session.history].count("assistant") == len(Phase)
+
+
+class StubTools:
+    tools = [{"type": "function", "function": {"name": "get_candidate_resume"}}]
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict]] = []
+
+    async def call(self, name, arguments):
+        self.calls.append((name, arguments))
+        if name == "boom":
+            raise RuntimeError("down")
+        return "RESUME TEXT"
+
+
+async def test_tool_call_round_trip_keeps_speech_clean():
+    from senjin.llm.client import ToolCall
+
+    llm = FakeLLM([[ToolCall("get_candidate_resume")], "Tell me about your ledger."])
+    tools = StubTools()
+    session = InterviewSession(llm, tools=tools)
+    spoken = await collect(session.open())
+    assert spoken == "Tell me about your ledger."
+    assert tools.calls == [("get_candidate_resume", {})]
+    assert llm.tools_seen[0] == tools.tools
+    # second model call saw the tool result
+    assert llm.calls[1][-1]["role"] == "tool" and llm.calls[1][-1]["content"] == "RESUME TEXT"
+    assert [m["role"] for m in session.history] == ["assistant", "tool", "assistant"]
+    assert session.history[-1]["content"] == "Tell me about your ledger."
+
+
+async def test_tool_failure_is_reported_to_model_not_raised():
+    from senjin.llm.client import ToolCall
+
+    llm = FakeLLM([[ToolCall("boom")], "Sorry, let's continue."])
+    session = InterviewSession(llm, tools=StubTools())
+    assert await collect(session.open()) == "Sorry, let's continue."
+    assert "ERROR: down" in llm.calls[1][-1]["content"]
+
+
+async def test_tool_loop_is_bounded():
+    from senjin.llm.client import ToolCall
+
+    llm = FakeLLM([[ToolCall("get_candidate_resume")]] * 10)
+    session = InterviewSession(llm, tools=StubTools())
+    await collect(session.open())
+    assert len(llm.calls) == 4  # initial + 3 tool rounds
+    assert llm.tools_seen[-1] is None  # last round forces a spoken reply

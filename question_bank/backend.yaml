@@ -1,0 +1,100 @@
+- id: be-rate-limiter
+  topic: system_design
+  difficulty: medium
+  prompt: Design a rate limiter for a public API that serves many customers. Walk me through your approach.
+  follow_ups:
+    - How would this work across multiple servers?
+    - What happens when your shared store is unavailable?
+    - How do you handle bursts versus sustained load?
+  rubric:
+    - Names a concrete algorithm (token bucket, sliding window) and its trade-offs
+    - Addresses distributed state and consistency
+    - Considers failure modes and fail-open versus fail-closed
+- id: be-url-shortener
+  topic: system_design
+  difficulty: easy
+  prompt: Design a URL shortening service. What are the main components?
+  follow_ups:
+    - How do you generate the short codes without collisions?
+    - How would you scale reads?
+  rubric:
+    - Covers ID generation and storage choice
+    - Reasons about read-heavy traffic and caching
+    - Mentions expiry, abuse, or analytics
+- id: be-event-pipeline
+  topic: system_design
+  difficulty: hard
+  prompt: Design a pipeline that ingests ten thousand events per second and makes them queryable within a minute.
+  follow_ups:
+    - How do you handle duplicates and late events?
+    - How do you guarantee ordering where it matters?
+  rubric:
+    - Uses a durable log or queue with partitioning
+    - Discusses delivery semantics and idempotency
+    - Addresses backpressure and schema evolution
+- id: al-dedupe-stream
+  topic: algorithms
+  difficulty: easy
+  prompt: Given a long stream of integers, how would you return the first value that appears twice?
+  follow_ups:
+    - What is the memory cost?
+    - What if the stream is too large to hold in memory?
+  rubric:
+    - Uses a hash set with linear time
+    - States time and space complexity correctly
+    - Handles the memory-bound variant (bloom filter, external approach)
+- id: al-lru-cache
+  topic: algorithms
+  difficulty: medium
+  prompt: Describe how you would implement an LRU cache with constant-time get and put.
+  follow_ups:
+    - How does it change if it must be thread-safe?
+    - How would you add per-entry expiry?
+  rubric:
+    - Combines a hash map with a doubly linked list
+    - Explains eviction and update paths clearly
+    - Discusses concurrency (locking granularity)
+- id: al-merge-intervals
+  topic: algorithms
+  difficulty: medium
+  prompt: You have a list of meeting time intervals. How would you find the minimum number of rooms needed?
+  follow_ups:
+    - What is the complexity of your approach?
+    - How would you handle intervals arriving online?
+  rubric:
+    - Sorts starts and ends, or uses a heap
+    - Correct complexity analysis
+    - Considers boundary cases such as touching intervals
+- id: db-slow-query
+  topic: databases
+  difficulty: medium
+  prompt: A production query that used to take fifty milliseconds now takes ten seconds. How do you investigate?
+  follow_ups:
+    - What would make an index not get used?
+    - How do you fix it without downtime?
+  rubric:
+    - Starts with measurement (explain plan, slow log) before guessing
+    - Knows common causes (stats, missing index, plan change, locks)
+    - Plans a safe rollout
+- id: db-consistency
+  topic: databases
+  difficulty: hard
+  prompt: Two services must update their own databases as part of one business action. How do you keep them consistent?
+  follow_ups:
+    - What are the failure cases of your approach?
+    - When would you accept eventual consistency?
+  rubric:
+    - Knows saga or outbox patterns and why two-phase commit is costly
+    - Addresses idempotency and retries
+    - Weighs business requirements against consistency
+- id: eng-incident
+  topic: engineering_practice
+  difficulty: easy
+  prompt: Tell me about debugging a production incident. How do you approach one from the first alert?
+  follow_ups:
+    - How do you communicate during it?
+    - What do you do afterward?
+  rubric:
+    - Prioritizes mitigation before root cause
+    - Communicates clearly and keeps a timeline
+    - Follows up with blameless review and prevention
