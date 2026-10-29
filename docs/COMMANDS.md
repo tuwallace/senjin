@@ -263,6 +263,22 @@ uv run senjin-meet selftest
 uv run senjin-meet login
 ```
 
+Switch the bot to a different Google account (stop any running `senjin-meet` first):
+
+```bash
+uv run senjin-meet logout                          # delete the saved sign-in (data/meet_profile)
+uv run senjin-meet keep-account                    # set the current sign-in aside, then sign in a new one
+uv run senjin-meet keep-account --label work       # same, saved as data/meet_profile_work
+```
+
+`keep-account` moves the old profile to `data/meet_profile_<label>` instead of deleting it. To go back to it: `uv run senjin-meet logout`, then `mv data/meet_profile_work data/meet_profile`.
+
+Find out why the bot cannot hear the call (joins, then prints the level recorded from the hear device and what Meet's audio elements are doing every 5 seconds; speak in the meeting while it runs):
+
+```bash
+uv run senjin-meet debug "https://meet.google.com/xxx-xxxx-xxx" --seconds 120
+```
+
 5. Create a Meet from another account or device (the host), then send the bot in. The host must admit the bot from the lobby:
 
 ```bash

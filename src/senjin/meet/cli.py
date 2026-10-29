@@ -1,4 +1,4 @@
-"""`senjin-meet devices | selftest | login | run`."""
+"""`senjin-meet devices | selftest | login | debug | run`."""
 
 import argparse
 import asyncio
@@ -6,6 +6,7 @@ from pathlib import Path
 
 from senjin.audio.stt import DEFAULT_WHISPER_MODEL
 from senjin.llm.client import DEFAULT_MODEL
+from senjin.meet.accounts import ProfileError, keep_account, logout
 from senjin.meet.audio import HEAR_DEVICE, SPEAK_DEVICE, DeviceError, find_bridge
 
 
@@ -33,7 +34,7 @@ async def login() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(prog="senjin-meet")
     sub = parser.add_subparsers(dest="cmd", required=True)
-    for name in ("selftest", "run", "devices"):
+    for name in ("selftest", "run", "devices", "debug"):
         p = sub.add_parser(name)
         p.add_argument("--speak-device", default=SPEAK_DEVICE, help="virtual mic the browser reads")
         p.add_argument(
@@ -41,7 +42,15 @@ def main() -> None:
         )
     for name in ("selftest", "run"):
         sub.choices[name].add_argument("--stt-model", default=DEFAULT_WHISPER_MODEL)
+    dbg = sub.choices["debug"]
+    dbg.add_argument("url")
+    dbg.add_argument("--seconds", type=float, default=60)
     sub.add_parser("login", help="sign the bot's Google account in (by hand, once)")
+    sub.add_parser("logout", help="delete the bot's saved Google sign-in")
+    keep = sub.add_parser(
+        "keep-account", help="set the current sign-in aside, then sign in with another account"
+    )
+    keep.add_argument("--label", help="name for the saved folder (default: a timestamp)")
     run = sub.choices["run"]
     run.add_argument("url", help="https://meet.google.com/xxx-xxxx-xxx")
     run.add_argument("--model", default=DEFAULT_MODEL)
@@ -68,6 +77,18 @@ def main() -> None:
                 f"speak: {bridge.speak_name} (#{bridge.speak_index})\n"
                 f"hear:  {bridge.hear_name} (#{bridge.hear_index})"
             )
+        elif args.cmd == "debug":
+            from senjin.meet.debug import run_debug
+
+            asyncio.run(run_debug(args.url, args.speak_device, args.hear_device, args.seconds))
+        elif args.cmd == "logout":
+            removed = logout()
+            print("Signed out: deleted data/meet_profile." if removed else "Already signed out.")
+        elif args.cmd == "keep-account":
+            saved = keep_account(label=args.label)
+            if saved:
+                print(f"Kept the current account in {saved}.")
+            asyncio.run(login())
         elif args.cmd == "login":
             asyncio.run(login())
         elif args.cmd == "selftest":
@@ -103,7 +124,7 @@ def main() -> None:
                         ROOT / "question_bank",
                     )
                 )
-    except DeviceError as exc:
+    except (DeviceError, ProfileError) as exc:
         raise SystemExit(f"error: {exc}") from None
 
 
