@@ -29,6 +29,8 @@ def voice_config(args) -> InterviewConfig:
         getattr(args, "max_questions", None),
         getattr(args, "max_minutes", None),
         getattr(args, "idle_seconds", None),
+        getattr(args, "silence_ms", None),
+        getattr(args, "filler_ms", None),
     )
 
 
@@ -99,8 +101,12 @@ async def run(args) -> None:
             stt,
             tts,
             player,
-            VoiceConfig(barge_in=not args.no_barge_in, idle_prompt_s=cfg.idle_seconds or None),
-            TurnConfig(end_silence_ms=args.silence_ms),
+            VoiceConfig(
+                barge_in=not args.no_barge_in,
+                idle_prompt_s=cfg.idle_seconds or None,
+                filler_delay_ms=cfg.filler_ms or None,
+            ),
+            TurnConfig(end_silence_ms=cfg.silence_ms),
             latency_path=out.with_suffix(".latency.jsonl"),
             on_text=lambda who, text: print(
                 f"\n{'Sen' if who == 'interviewer' else 'You'}: {text}"
@@ -164,7 +170,8 @@ async def simulate(args) -> None:
         )
         loop = VoiceLoop(
             session, SileroVAD(SILERO_PATH), stt, tts, SilentPlayer(tts.sample_rate),
-            VoiceConfig(), TurnConfig(end_silence_ms=args.silence_ms),
+            VoiceConfig(filler_delay_ms=cfg.filler_ms or None),
+            TurnConfig(end_silence_ms=cfg.silence_ms),
             latency_path=out.with_suffix(".latency.jsonl"),
             on_text=lambda who, text: print(f"{'Sen' if who == 'interviewer' else 'You'}: {text}"),
         )  # fmt: skip
@@ -220,7 +227,8 @@ def main() -> None:
     run_p.add_argument(
         "--no-barge-in", action="store_true", help="use with speakers, not headphones"
     )
-    run_p.add_argument("--silence-ms", type=int, default=800, help="silence that ends your turn")
+    run_p.add_argument("--silence-ms", type=int, help="env SENJIN_SILENCE_MS, default 700")
+    run_p.add_argument("--filler-ms", type=int, help="env SENJIN_FILLER_MS, default 1100 (0 = off)")
     run_p.add_argument(
         "--max-questions", type=int, help="questions to ask (env SENJIN_MAX_QUESTIONS, default 5)"
     )
@@ -236,7 +244,8 @@ def main() -> None:
     sim_p = sub.choices["simulate"]
     sim_p.add_argument("--model", default=DEFAULT_MODEL)
     sim_p.add_argument("--turns", type=int, default=6, help="candidate answers to play (max 6)")
-    sim_p.add_argument("--silence-ms", type=int, default=800)
+    sim_p.add_argument("--silence-ms", type=int)
+    sim_p.add_argument("--filler-ms", type=int)
     sim_p.add_argument("--out", type=Path)
     rep = sub.add_parser("report", help="summarize a .latency.jsonl file")
     rep.add_argument("path", type=Path)

@@ -5,6 +5,9 @@ SENJIN_RESUME_QUESTIONS  how many of those are about the resume (default: 40%, a
 SENJIN_QA_TURNS          replies reserved for the candidate's own questions (default 3, 1 to 10)
 SENJIN_MAX_MINUTES       time box for the whole interview (default 45)
 SENJIN_IDLE_SECONDS      silence before "Are you still there?" (default 25, 0 turns it off)
+SENJIN_SILENCE_MS        silence that ends the candidate's turn (default 700, 200 to 3000)
+SENJIN_FILLER_MS         play a short "Mm-hm." if no reply has started this long after the
+                         candidate stops (default 1100, 0 turns it off)
 
 The greeting, the candidate Q&A and the goodbye are not counted as interview questions.
 """
@@ -55,6 +58,8 @@ class InterviewConfig:
     qa_turns: int = 3
     max_minutes: float = 45.0
     idle_seconds: float = 25.0
+    silence_ms: int = 700
+    filler_ms: int = 1100
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "InterviewConfig":
@@ -69,6 +74,8 @@ class InterviewConfig:
             qa_turns=int(_number(env, "SENJIN_QA_TURNS", 3, 1, 10)),
             max_minutes=_number(env, "SENJIN_MAX_MINUTES", 45, 1, 600),
             idle_seconds=_number(env, "SENJIN_IDLE_SECONDS", 25, 0, 3600),
+            silence_ms=int(_number(env, "SENJIN_SILENCE_MS", 700, 200, 3000)),
+            filler_ms=int(_number(env, "SENJIN_FILLER_MS", 1100, 0, 10000)),
         )
 
     def with_max_questions(self, n: int) -> "InterviewConfig":
@@ -81,6 +88,8 @@ class InterviewConfig:
         max_questions: int | None = None,
         max_minutes: float | None = None,
         idle_seconds: float | None = None,
+        silence_ms: int | None = None,
+        filler_ms: int | None = None,
     ) -> "InterviewConfig":
         """Command-line flags win over the environment."""
         cfg = self.with_max_questions(max_questions) if max_questions is not None else self
@@ -88,6 +97,10 @@ class InterviewConfig:
             cfg = replace(cfg, max_minutes=max_minutes)
         if idle_seconds is not None:
             cfg = replace(cfg, idle_seconds=idle_seconds)
+        if silence_ms is not None:
+            cfg = replace(cfg, silence_ms=silence_ms)
+        if filler_ms is not None:
+            cfg = replace(cfg, filler_ms=filler_ms)
         return cfg
 
     @property

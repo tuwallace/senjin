@@ -63,7 +63,8 @@ def main() -> None:
     run.add_argument("--out", type=Path)
     run.add_argument("--admit-timeout", type=float, default=300)
     run.add_argument("--wait-candidate", type=float, default=600)
-    run.add_argument("--silence-ms", type=int, default=800)
+    run.add_argument("--silence-ms", type=int, help="env SENJIN_SILENCE_MS, default 700")
+    run.add_argument("--filler-ms", type=int, help="env SENJIN_FILLER_MS, default 1100 (0 = off)")
     run.add_argument("--max-questions", type=int, help="env SENJIN_MAX_QUESTIONS, default 5")
     run.add_argument("--max-minutes", type=float, help="env SENJIN_MAX_MINUTES, default 45")
     run.add_argument("--idle-seconds", type=float, help="env SENJIN_IDLE_SECONDS, default 25")
@@ -109,9 +110,13 @@ def main() -> None:
                     args.url, model=args.model, stt_model=args.stt_model,
                     speak=args.speak_device, hear=args.hear_device, out=out,
                     admit_timeout=args.admit_timeout, wait_candidate=args.wait_candidate,
-                    silence_ms=args.silence_ms, guest_name=args.guest_name,
+                    guest_name=args.guest_name,
                     config=InterviewConfig.from_env().override(
-                        args.max_questions, args.max_minutes, args.idle_seconds
+                        args.max_questions,
+                        args.max_minutes,
+                        args.idle_seconds,
+                        args.silence_ms,
+                        args.filler_ms,
                     ),
                     exemplars=args.exemplars, candidate_dir=args.candidate_dir,
                 )

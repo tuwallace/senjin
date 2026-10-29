@@ -35,12 +35,16 @@ By default Senjin asks 5 interview questions: 2 about the candidate's background
 | `SENJIN_QA_TURNS` | 3 | replies reserved for the candidate's questions (1 to 10) |
 | `SENJIN_MAX_MINUTES` | 45 | time box for the whole interview |
 | `SENJIN_IDLE_SECONDS` | 25 | silence before "Are you still there?" (0 = off) |
+| `SENJIN_SILENCE_MS` | 700 | silence that ends the candidate's turn (200 to 3000); lower is snappier but may cut people off |
+| `SENJIN_FILLER_MS` | 1100 | if no reply has started this long after the candidate stops, play a short "Mm-hm." / "Okay." / "Right." / "I see." (0 = off) |
 
 ```bash
 export SENJIN_MAX_QUESTIONS=8            # for this terminal session
 SENJIN_MAX_QUESTIONS=3 uv run senjin-voice run      # for one command
 uv run senjin-meet run URL --max-questions 4        # a flag beats the variable
 ```
+
+The filler clip fills dead air: the clips are recorded with Piper at startup, play only when the reply is slow, never twice in a row, and are not part of what the model remembers (the transcript logs them as `filler` rows). Flags: `--silence-ms`, `--filler-ms` on `senjin-voice run`, `senjin-voice simulate` and `senjin-meet run`; `senjin-voice report` shows how often the filler played.
 
 Bad values stop the program with a message naming the variable. Every `chat`, `voice run` and `meet run` prints the plan when it starts, for example `Interview plan: 5 questions (2 background + 3 technical)...`. Settings live in `src/senjin/config.py`.
 

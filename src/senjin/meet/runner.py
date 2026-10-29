@@ -35,7 +35,6 @@ async def run_meet_interview(
     out: Path,
     admit_timeout: float = 300.0,
     wait_candidate: float = 600.0,
-    silence_ms: int = 800,
     config: InterviewConfig | None = None,
     guest_name: str = "Sen (AI interviewer)",
     exemplars: Path | None = None,
@@ -78,8 +77,11 @@ async def run_meet_interview(
             )
             loop = VoiceLoop(
                 session, SileroVAD(SILERO_PATH), stt, tts, player,
-                VoiceConfig(idle_prompt_s=cfg.idle_seconds or None),
-                TurnConfig(end_silence_ms=silence_ms),
+                VoiceConfig(
+                    idle_prompt_s=cfg.idle_seconds or None,
+                    filler_delay_ms=cfg.filler_ms or None,
+                ),
+                TurnConfig(end_silence_ms=cfg.silence_ms),
                 latency_path=out.with_suffix(".latency.jsonl"),
                 on_text=lambda who, text: log(f"{LABEL[who]}: {text}"),
             )  # fmt: skip

@@ -3,7 +3,7 @@ import time
 
 import numpy as np
 
-from senjin.audio.loop import VoiceConfig, VoiceLoop, summarize
+from senjin.audio.loop import FILLER_TAG, FILLERS, VoiceConfig, VoiceLoop, summarize
 from senjin.audio.stt import clean_transcript, to_wav_bytes
 from senjin.audio.tts import SentenceSplitter
 from senjin.audio.vad import FRAME, TurnConfig, TurnDetector
@@ -318,3 +318,98 @@ async def test_talking_over_the_goodbye_does_not_cut_it_off():
     assert loop.interruptions == 0  # (the final stop() on exit is not an interruption)
     assert session.history[0]["content"].endswith("Goodbye.")
     assert session.finished
+
+
+class SlowLLM(FakeLLM):
+    """First text arrives `delay` seconds after the request (not for the opening)."""
+
+    def __init__(self, replies, delay):
+        super().__init__(replies)
+        self.delay = delay
+
+    async def stream(self, messages, tools=None):
+        if self.calls:  # skip the opening
+            await asyncio.sleep(self.delay)
+        async for event in super().stream(messages, tools):
+            yield event
+
+
+def make_slow_loop(delay, filler_ms=100, replies=None):
+    llm = SlowLLM(replies or ["Welcome, are you ready?", "Good. Tell me about a project."], delay)
+    session = InterviewSession(llm)
+    player = FakePlayer(0.03)
+    config = VoiceConfig(idle_prompt_s=None, filler_delay_ms=filler_ms)
+    loop = VoiceLoop(session, fake_vad, FakeSTT(["I am ready"]), FakeTTS(), player, config)
+    return loop, session, player
+
+
+async def run_one_turn(loop, session):
+    script = "." * 40 + "s" * 20
+    until = lambda: len(loop.records) >= 2 and not loop.busy  # noqa: E731
+    await asyncio.wait_for(loop.run(frames(script, {}, until)), 10)
+
+
+async def test_filler_plays_when_the_reply_is_slow_and_stays_out_of_history():
+    loop, session, player = make_slow_loop(delay=0.5, filler_ms=100)
+    played = []
+    original = player.enqueue
+    player.enqueue = lambda audio, tag: (played.append(tag), original(audio, tag))[1]
+    await run_one_turn(loop, session)
+    fillers = [t for t in played if t.startswith(FILLER_TAG)]
+    assert len(fillers) == 1 and fillers[0][len(FILLER_TAG) :] in FILLERS
+    assert played.index(fillers[0]) < len(played) - 1  # the real reply follows the filler
+    assert loop.records[1]["filler"] in FILLERS
+    spoken = [m["content"] for m in session.history]
+    assert not any(f in " ".join(spoken) for f in FILLERS)
+    assert "filler clip played" in summarize(
+        loop.records + [{**loop.records[1], "to_first_audio_s": 1}]
+    )
+
+
+async def test_no_filler_when_the_reply_is_fast():
+    loop, session, player = make_slow_loop(delay=0.0, filler_ms=400)
+    await run_one_turn(loop, session)
+    assert "filler" not in loop.records[1]
+
+
+async def test_filler_can_be_turned_off():
+    loop, session, player = make_slow_loop(delay=0.5, filler_ms=0)
+    await run_one_turn(loop, session)
+    assert "filler" not in loop.records[1]
+    assert loop._fillers == []
+
+
+async def test_fillers_rotate_instead_of_repeating():
+    loop, session, player = make_slow_loop(delay=0.0, filler_ms=50)
+    await loop._prepare_fillers()
+    first = []
+    for _ in range(3):
+        rec: dict = {}
+        await loop._filler_after(rec, loop.clock() - 1)
+        first.append(rec["filler"])
+    assert len(set(first)) == 3
+
+
+async def test_barge_in_during_a_filler_does_not_become_interviewer_speech():
+    loop, session, player = make_slow_loop(delay=1.0, filler_ms=50)
+    player.clip_s = 0.5  # long filler so the candidate cuts in while it is playing
+    script = "." * 40 + "s" * 20 + "." * 60 + "s" * 20  # second utterance interrupts the reply
+    loop.stt.texts = ["I am ready", "wait, one more thing"]
+    until = lambda: loop.interruptions >= 1 and not loop.busy and len(loop.stt.texts) == 0  # noqa: E731
+    await asyncio.wait_for(loop.run(frames(script, {}, until)), 15)
+    assert loop.interruptions >= 1
+    assert not any(f in m["content"] for m in session.history for f in FILLERS)
+
+
+async def test_no_filler_on_two_turns_in_a_row():
+    llm = SlowLLM(["Welcome, ready?", "Okay. Tell me more.", "Thanks. And then?"], 0.5)
+    session = InterviewSession(llm)
+    config = VoiceConfig(idle_prompt_s=None, filler_delay_ms=100)
+    loop = VoiceLoop(
+        session, fake_vad, FakeSTT(["first", "second"]), FakeTTS(), FakePlayer(0.03), config
+    )
+    script = "." * 40 + "s" * 20 + "." * 120 + "s" * 20
+    until = lambda: len(loop.records) >= 3 and not loop.busy  # noqa: E731
+    await asyncio.wait_for(loop.run(frames(script, {}, until)), 20)
+    assert "filler" in loop.records[1]
+    assert "filler" not in loop.records[2]

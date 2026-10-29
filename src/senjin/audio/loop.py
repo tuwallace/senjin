@@ -28,6 +28,8 @@ GOODBYE_IDLE = (
     "The team will follow up about next steps. Goodbye."
 )
 APOLOGY = "Sorry, I had a technical problem. Could you say that again?"
+FILLER_TAG = "\x00filler:"  # marks filler clips so they never count as spoken interviewer words
+FILLERS = ["Mm-hm.", "Okay.", "Right.", "I see."]
 GOODBYE_ERRORS = (
     "I'm having technical difficulties, so I'll end the call here. "
     "Someone from the team will follow up with you. Goodbye."
@@ -50,6 +52,7 @@ class VoiceConfig:
     idle_prompt_s: float | None = 25.0  # silence before "Are you still there?" (None disables)
     max_idle_prompts: int = 2  # prompts before the call is ended politely
     max_consecutive_errors: int = 3  # failed replies in a row before the call is ended
+    filler_delay_ms: int | None = 1100  # play a short filler if no reply by then (None = off)
 
 
 class VoiceLoop:
@@ -83,12 +86,16 @@ class VoiceLoop:
         self._idle_prompts = 0
         self._errors_in_row = 0
         self._recover = False
+        self._fillers: list[tuple[str, np.ndarray]] = []
+        self._last_filler = -1
+        self._filled_last_turn = False  # never two fillers in a row: it would sound canned
 
     @property
     def busy(self) -> bool:
         return self._turn is not None and not self._turn.done()
 
     async def run(self, frames: AsyncIterator[np.ndarray]) -> None:
+        await self._prepare_fillers()
         self._start_turn(self._speak(self.session.open(), {"turn": "open"}, None))
         try:
             async for frame in frames:
@@ -160,7 +167,7 @@ class VoiceLoop:
 
     async def _interrupt(self) -> None:
         self.interruptions += 1
-        started = self.player.stop()
+        started = [t for t in self.player.stop() if not t.startswith(FILLER_TAG)]
         if self._stt_audio is not None:  # cut in while the last utterance was being transcribed
             self._carry = self._stt_audio
         await self._cancel_turn()
@@ -223,17 +230,45 @@ class VoiceLoop:
                 self.player.enqueue(audio, sentence)
 
         producer, consumer = asyncio.create_task(produce()), asyncio.create_task(consume())
+        filler = None
+        if (
+            t_end is not None
+            and self._fillers
+            and self.config.filler_delay_ms
+            and not self._filled_last_turn
+        ):
+            filler = asyncio.create_task(self._filler_after(rec, t_end))
         try:
             await asyncio.gather(producer, consumer)
             await self.player.wait_idle()
         finally:
-            for task in (producer, consumer):
+            tasks = [t for t in (producer, consumer, filler) if t]
+            for task in tasks:
                 task.cancel()
-            await asyncio.gather(producer, consumer, return_exceptions=True)
+            await asyncio.gather(*tasks, return_exceptions=True)
             if said:
                 self.on_text("interviewer", " ".join(said))
             self._finish_record(rec, t_end)
             self._idle_since = self.clock()
+
+    async def _prepare_fillers(self) -> None:
+        if self.config.filler_delay_ms and not self._fillers:
+            self._fillers = [(phrase, await self.tts.synth(phrase)) for phrase in FILLERS]
+
+    async def _filler_after(self, rec: dict, t_end: float) -> None:
+        """If no reply audio exists by the delay, play a short neutral acknowledgement."""
+        wait = (self.config.filler_delay_ms or 0) / 1000 - (self.clock() - t_end)
+        if wait > 0:
+            await asyncio.sleep(wait)
+        if "_enqueued_at" in rec:  # the real reply got there first
+            return
+        index = (self._last_filler + 1) % len(self._fillers)
+        self._last_filler = index
+        phrase, audio = self._fillers[index]
+        rec["filler"] = phrase
+        self.player.enqueue(audio, FILLER_TAG + phrase)
+        if self.session.log:
+            self.session.log.append("filler", phrase, self.session.state.phase.value)
 
     def _finish_record(self, rec: dict, t_end: float | None) -> None:
         enqueued = rec.pop("_enqueued_at", None)
@@ -243,6 +278,7 @@ class VoiceLoop:
         if t_end is not None and first is not None:
             rec["to_first_sound_s"] = round(first - t_end, 3)
         rec["endpoint_ms"] = self.turn_config.end_silence_ms
+        self._filled_last_turn = "filler" in rec
         self.records.append(rec)
         if self.latency_path:
             self.latency_path.parent.mkdir(parents=True, exist_ok=True)
@@ -270,5 +306,8 @@ def summarize(records: list[dict]) -> str:
     ]
     if total is not None:
         lines.append(f"end-of-speech -> first sound   mean {total:.2f}s")
+    fillers = sum(1 for r in rows if r.get("filler"))
+    if fillers:
+        lines.append(f"filler clip played on {fillers} of {len(rows)} turns")
     lines.append(f"(endpoint wait before this clock starts: {rows[0]['endpoint_ms']} ms)")
     return "\n".join(lines)

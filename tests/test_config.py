@@ -115,3 +115,17 @@ async def test_interview_asks_exactly_n_questions_then_hands_over_to_candidate(n
     assert questions == n
     assert spoken_by_phase["intro"] == 1 and spoken_by_phase["signoff"] == 1
     assert spoken_by_phase["candidate_qa"] <= cfg.qa_turns
+
+
+def test_voice_timing_defaults_and_overrides():
+    cfg = InterviewConfig.from_env({})
+    assert (cfg.silence_ms, cfg.filler_ms) == (700, 1100)
+    cfg = InterviewConfig.from_env({"SENJIN_SILENCE_MS": "500", "SENJIN_FILLER_MS": "0"})
+    assert (cfg.silence_ms, cfg.filler_ms) == (500, 0)
+    assert cfg.override(silence_ms=650, filler_ms=1200).silence_ms == 650
+
+
+@pytest.mark.parametrize("env", [{"SENJIN_SILENCE_MS": "50"}, {"SENJIN_FILLER_MS": "-1"}])
+def test_voice_timing_bounds(env):
+    with pytest.raises(ConfigError):
+        InterviewConfig.from_env(env)
