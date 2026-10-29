@@ -13,23 +13,23 @@ from senjin.interview.state import Phase
 from senjin.llm.client import OllamaClient, ToolCall
 from senjin.llm.tools import open_mcp_tools
 
-# (phase, history, expected tool name or None for "speak, no tool")
+# (phase, history, acceptable first actions: tool names, or None for "speak, no tool")
 SCENARIOS = [
-    (Phase.RESUME_DIVE, [{"role": "user", "content": "Yes, I'm ready."}], "get_candidate_resume"),
+    (Phase.RESUME_DIVE, [{"role": "user", "content": "Yes, I'm ready."}], {"get_candidate_resume"}),
     (
         Phase.TECHNICAL,
         [{"role": "user", "content": "Sure, let's move on to the technical part."}],
-        "get_next_technical_question",
+        {"get_next_technical_question"},
     ),
     (
         Phase.INTRO,
         [{"role": "user", "content": "[The call has connected. Begin the interview.]"}],
-        None,
+        {None},
     ),
     (
         Phase.CANDIDATE_QA,
         [{"role": "user", "content": "What does the on-call rotation look like?"}],
-        None,
+        {None, "get_job_description"},  # looking up the role before answering is fine
     ),
 ]
 REPEATS = 3
@@ -53,7 +53,7 @@ async def run_model(model: str, tools: list[dict]) -> None:
                     called = event.name
             ttft.append(first or 0.0)
             total += 1
-            ok += called == expected
+            ok += called in expected
     print(f"{model:36} tool accuracy {ok}/{total}  mean first-event {sum(ttft) / len(ttft):.2f}s")
 
 
