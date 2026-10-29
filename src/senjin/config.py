@@ -2,15 +2,15 @@
 
 SENJIN_MAX_QUESTIONS     questions asked in the background + technical parts (default 5, 2 to 30)
 SENJIN_RESUME_QUESTIONS  how many of those are about the resume (default: 40%, at least 1)
-SENJIN_QA_TURNS          answers reserved for the candidate's own questions (default 3, 1 to 10);
-                         the invitation to ask comes on top
 SENJIN_MAX_MINUTES       time box for the whole interview (default 45)
 SENJIN_IDLE_SECONDS      silence before "Are you still there?" (default 25, 0 turns it off)
 SENJIN_SILENCE_MS        silence that ends the candidate's turn (default 700, 200 to 3000)
-SENJIN_FILLER_MS         play a short "Mm-hm." if no reply has started this long after the
-                         candidate stops (default 1100, 0 turns it off)
+SENJIN_FILLER_MS         play "Okay, right." or "I see." if no reply has started this long
+                         after the candidate stops (default 1100, 0 turns it off)
 
-The greeting, the candidate Q&A and the goodbye are not counted as interview questions.
+The greeting, the candidate's own Q&A and the goodbye are not counted as interview questions.
+The candidate Q&A has no limit: it goes on until the candidate says they are done, the time box
+runs out, or the candidate goes silent.
 """
 
 import math
@@ -56,7 +56,6 @@ def _number(env: Mapping[str, str], name: str, default: float, low: float, high:
 class InterviewConfig:
     max_questions: int = 5
     resume_questions: int | None = None  # None: derive from max_questions
-    qa_turns: int = 3
     max_minutes: float = 45.0
     idle_seconds: float = 25.0
     silence_ms: int = 700
@@ -72,7 +71,6 @@ class InterviewConfig:
         return cls(
             max_questions=questions,
             resume_questions=resume,
-            qa_turns=int(_number(env, "SENJIN_QA_TURNS", 3, 1, 10)),
             max_minutes=_number(env, "SENJIN_MAX_MINUTES", 45, 1, 600),
             idle_seconds=_number(env, "SENJIN_IDLE_SECONDS", 25, 0, 3600),
             silence_ms=int(_number(env, "SENJIN_SILENCE_MS", 700, 200, 3000)),
@@ -119,10 +117,11 @@ class InterviewConfig:
             Phase.INTRO: 1,
             Phase.RESUME_DIVE: self.resume,
             Phase.TECHNICAL: self.technical,
-            Phase.CANDIDATE_QA: self.qa_turns + 1,  # the invitation itself is not an answer
             Phase.SIGNOFF: 1,
         }
-        return {p: Budget(turns[p], DEFAULT_BUDGETS[p].max_seconds) for p in Phase}
+        budgets = {p: Budget(n, DEFAULT_BUDGETS[p].max_seconds) for p, n in turns.items()}
+        budgets[Phase.CANDIDATE_QA] = DEFAULT_BUDGETS[Phase.CANDIDATE_QA]  # unlimited
+        return {p: budgets[p] for p in Phase}
 
     def state(self) -> InterviewState:
         return InterviewState(budgets=self.budgets(), max_total_seconds=self.max_minutes * 60)
@@ -130,6 +129,6 @@ class InterviewConfig:
     def describe(self) -> str:
         return (
             f"Interview plan: {self.max_questions} questions ({self.resume} background + "
-            f"{self.technical} technical), then up to {self.qa_turns} answers to the "
-            f"candidate's questions, within {self.max_minutes:g} minutes."
+            f"{self.technical} technical), then as many answers to the candidate's own questions "
+            f"as they want, within {self.max_minutes:g} minutes."
         )

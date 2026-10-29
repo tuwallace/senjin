@@ -32,17 +32,18 @@ By default Senjin asks 5 interview questions: 2 about the candidate's background
 | :-- | :-- | :-- |
 | `SENJIN_MAX_QUESTIONS` | 5 | questions asked, background plus technical (2 to 30) |
 | `SENJIN_RESUME_QUESTIONS` | 40% of the above, at least 1 | how many of those are about the resume |
-| `SENJIN_QA_TURNS` | 3 | answers to the candidate's own questions (1 to 10); the invitation to ask comes on top |
 | `SENJIN_MAX_MINUTES` | 45 | time box for the whole interview |
 | `SENJIN_IDLE_SECONDS` | 25 | silence before "Are you still there?" (0 = off) |
 | `SENJIN_SILENCE_MS` | 700 | silence that ends the candidate's turn (200 to 3000); lower is snappier but may cut people off |
-| `SENJIN_FILLER_MS` | 1100 | if no reply has started this long after the candidate stops, play a short "Mm-hm." / "Okay." / "Right." / "I see." (0 = off) |
+| `SENJIN_FILLER_MS` | 1100 | if no reply has started this long after the candidate stops, play a short "Okay, right." or "I see." (picked at random) (0 = off) |
 
 ```bash
 export SENJIN_MAX_QUESTIONS=8            # for this terminal session
 SENJIN_MAX_QUESTIONS=3 uv run senjin-voice run      # for one command
 uv run senjin-meet run URL --max-questions 4        # a flag beats the variable
 ```
+
+The candidate's own Q&A has no limit: Sen keeps answering until the candidate says they are done (for example "no, I'm good" or "that's all"), the time box (`SENJIN_MAX_MINUTES`) runs out, or the candidate goes silent.
 
 The filler clip fills dead air: the clips are recorded with Piper at startup, play only when the reply is slow, never twice in a row, and are not part of what the model remembers (the transcript logs them as `filler` rows). Flags: `--silence-ms`, `--filler-ms` on `senjin-voice run`, `senjin-voice simulate` and `senjin-meet run`; `senjin-voice report` shows how often the filler played.
 

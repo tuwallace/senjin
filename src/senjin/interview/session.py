@@ -29,8 +29,17 @@ from senjin.llm.tools import ToolRunner
 MAX_TOOL_ROUNDS = 3
 
 _NO_MORE_QUESTIONS = re.compile(
-    r"^(no|nope|nah|nothing)\b|no (more |other )?questions|that'?s (all|it)|"
-    r"i'?m (good|all set|done)|nothing (else|more)|all good",
+    r"^(no|nope|nah|nothing)\b|no (more |other |further )?questions|that'?s (all|it)|"
+    r"that is (all|it)|i'?m (good|all set|done|fine)|we'?re (good|done)|"
+    r"nothing (else|more|further)|all good|^(thanks|thank you)\b|"
+    r"^(ok|okay),? (thanks|thank you|that'?s)",
+    re.IGNORECASE,
+)
+
+# Signs the candidate is still asking something, so "No, but what about..." keeps Q&A going.
+_STILL_ASKING = re.compile(
+    r"\?|\b(but|actually|wait|also|one more|another|what|how|when|where|who|why|which|"
+    r"can you|could you|tell me|do you|is there|are there)\b",
     re.IGNORECASE,
 )
 
@@ -76,7 +85,7 @@ class InterviewSession:
         if target := self.state.wrap_up_target(now):
             self.state.jump(target, now)
             await self._enter_phase()
-        elif self.prefetch and self._candidate_is_done(candidate_text):
+        elif self._candidate_is_done(candidate_text):
             self.state.jump(Phase.SIGNOFF, now)
             await self._enter_phase()
         elif self.state.due_to_advance(now):
@@ -91,9 +100,11 @@ class InterviewSession:
             yield chunk
 
     def _candidate_is_done(self, text: str) -> bool:
-        """In Q&A, "no, I'm good" ends the interview early."""
+        """In Q&A, "no, I'm good" ends the interview: the candidate decides when Q&A is over."""
         in_qa = self.state.phase == Phase.CANDIDATE_QA and self.state.turns_in_phase >= 1
-        return in_qa and len(text.split()) <= 12 and bool(_NO_MORE_QUESTIONS.search(text.strip()))
+        if not in_qa or len(text.split()) > 12 or _STILL_ASKING.search(text):
+            return False
+        return bool(_NO_MORE_QUESTIONS.search(text.strip()))
 
     async def _enter_phase(self) -> None:
         """Orchestrated mode: load what the new phase needs, without a model round trip."""

@@ -6,6 +6,7 @@ interviewer's history keeps only the words that were actually spoken.
 
 import asyncio
 import json
+import random
 import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import aclosing
@@ -29,7 +30,8 @@ GOODBYE_IDLE = (
 )
 APOLOGY = "Sorry, I had a technical problem. Could you say that again?"
 FILLER_TAG = "\x00filler:"  # marks filler clips so they never count as spoken interviewer words
-FILLERS = ["Mm-hm.", "Okay.", "Right.", "I see."]
+# Plain words only: Piper spells out interjections such as "Mm-hm" letter by letter.
+FILLERS = ["Okay, right.", "I see."]
 GOODBYE_ERRORS = (
     "I'm having technical difficulties, so I'll end the call here. "
     "Someone from the team will follow up with you. Goodbye."
@@ -87,7 +89,7 @@ class VoiceLoop:
         self._errors_in_row = 0
         self._recover = False
         self._fillers: list[tuple[str, np.ndarray]] = []
-        self._last_filler = -1
+        self._rng = random.Random()
         self._filled_last_turn = False  # never two fillers in a row: it would sound canned
 
     @property
@@ -262,9 +264,7 @@ class VoiceLoop:
             await asyncio.sleep(wait)
         if "_enqueued_at" in rec:  # the real reply got there first
             return
-        index = (self._last_filler + 1) % len(self._fillers)
-        self._last_filler = index
-        phrase, audio = self._fillers[index]
+        phrase, audio = self._rng.choice(self._fillers)
         rec["filler"] = phrase
         self.player.enqueue(audio, FILLER_TAG + phrase)
         if self.session.log:

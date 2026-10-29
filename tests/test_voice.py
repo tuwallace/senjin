@@ -379,15 +379,20 @@ async def test_filler_can_be_turned_off():
     assert loop._fillers == []
 
 
-async def test_fillers_rotate_instead_of_repeating():
+def test_filler_phrases_are_plain_words_piper_can_say():
+    assert FILLERS == ["Okay, right.", "I see."]
+
+
+async def test_fillers_are_chosen_at_random_from_the_two_phrases():
     loop, session, player = make_slow_loop(delay=0.0, filler_ms=50)
     await loop._prepare_fillers()
-    first = []
-    for _ in range(3):
+    seen = []
+    for _ in range(60):
         rec: dict = {}
         await loop._filler_after(rec, loop.clock() - 1)
-        first.append(rec["filler"])
-    assert len(set(first)) == 3
+        seen.append(rec["filler"])
+    assert set(seen) == set(FILLERS)  # both appear
+    assert seen != sorted(seen) and seen != seen[::-1]  # not a fixed pattern
 
 
 async def test_barge_in_during_a_filler_does_not_become_interviewer_speech():

@@ -14,15 +14,15 @@ class Phase(StrEnum):
 
 @dataclass(frozen=True)
 class Budget:
-    max_turns: int  # interviewer utterances allowed in this phase
-    max_seconds: float
+    max_turns: int | None  # interviewer utterances allowed in this phase (None = no limit)
+    max_seconds: float | None  # time allowed in this phase (None = no limit)
 
 
 DEFAULT_BUDGETS: dict[Phase, Budget] = {
     Phase.INTRO: Budget(max_turns=1, max_seconds=90),
     Phase.RESUME_DIVE: Budget(max_turns=4, max_seconds=5 * 60),
     Phase.TECHNICAL: Budget(max_turns=8, max_seconds=15 * 60),
-    Phase.CANDIDATE_QA: Budget(max_turns=3, max_seconds=4 * 60),
+    Phase.CANDIDATE_QA: Budget(max_turns=None, max_seconds=None),  # the candidate decides
     Phase.SIGNOFF: Budget(max_turns=1, max_seconds=60),
 }
 
@@ -54,10 +54,11 @@ class InterviewState:
 
     def due_to_advance(self, now: float) -> bool:
         budget = self.budgets[self.phase]
-        return (
-            self.turns_in_phase >= budget.max_turns
-            or now - self.phase_started_at >= budget.max_seconds
+        turns_up = budget.max_turns is not None and self.turns_in_phase >= budget.max_turns
+        time_up = (
+            budget.max_seconds is not None and now - self.phase_started_at >= budget.max_seconds
         )
+        return turns_up or time_up
 
     def advance(self, now: float) -> Phase | None:
         """Move to the next phase; return it, or None (and finish) after the last one."""

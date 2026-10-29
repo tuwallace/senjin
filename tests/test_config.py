@@ -9,12 +9,15 @@ from senjin.llm.fake import FakeLLM
 def test_defaults_are_five_questions_split_two_and_three():
     cfg = InterviewConfig.from_env({})
     assert (cfg.max_questions, cfg.resume, cfg.technical) == (5, 2, 3)
-    turns = {p: b.max_turns for p, b in cfg.budgets().items()}
+    budgets = cfg.budgets()
+    turns = {p: b.max_turns for p, b in budgets.items()}
+    assert budgets[Phase.CANDIDATE_QA].max_turns is None  # the candidate decides
+    assert budgets[Phase.CANDIDATE_QA].max_seconds is None
+    del turns[Phase.CANDIDATE_QA]
     assert turns == {
         Phase.INTRO: 1,
         Phase.RESUME_DIVE: 2,
         Phase.TECHNICAL: 3,
-        Phase.CANDIDATE_QA: 4,  # invitation + 3 answers
         Phase.SIGNOFF: 1,
     }
 
@@ -33,12 +36,11 @@ def test_environment_overrides_every_limit():
         {
             "SENJIN_MAX_QUESTIONS": "7",
             "SENJIN_RESUME_QUESTIONS": "1",
-            "SENJIN_QA_TURNS": "2",
             "SENJIN_MAX_MINUTES": "20",
             "SENJIN_IDLE_SECONDS": "0",
         }
     )
-    assert (cfg.resume, cfg.technical, cfg.qa_turns) == (1, 6, 2)
+    assert (cfg.resume, cfg.technical) == (1, 6)
     assert cfg.max_minutes == 20 and cfg.idle_seconds == 0
     assert cfg.state().max_total_seconds == 1200
 
@@ -50,7 +52,6 @@ def test_environment_overrides_every_limit():
         ({"SENJIN_MAX_QUESTIONS": "1"}, "SENJIN_MAX_QUESTIONS"),
         ({"SENJIN_MAX_QUESTIONS": "500"}, "SENJIN_MAX_QUESTIONS"),
         ({"SENJIN_MAX_QUESTIONS": "5", "SENJIN_RESUME_QUESTIONS": "5"}, "SENJIN_RESUME_QUESTIONS"),
-        ({"SENJIN_QA_TURNS": "0"}, "SENJIN_QA_TURNS"),
         ({"SENJIN_MAX_MINUTES": "-3"}, "SENJIN_MAX_MINUTES"),
     ],
 )
@@ -109,12 +110,13 @@ async def test_interview_asks_exactly_n_questions_then_hands_over_to_candidate(n
     await say(session.open())
     guard = 0
     while not session.finished and guard < 100:
-        await say(session.respond("an answer"))
+        in_qa = session.state.phase.value == "candidate_qa"
+        await say(session.respond("No, I'm good." if in_qa else "an answer"))
         guard += 1
     questions = spoken_by_phase["resume_dive"] + spoken_by_phase["technical"]
     assert questions == n
     assert spoken_by_phase["intro"] == 1 and spoken_by_phase["signoff"] == 1
-    assert spoken_by_phase["candidate_qa"] <= cfg.qa_turns + 1
+    assert spoken_by_phase["candidate_qa"] == 1  # just the invitation, then "no, I'm good"
 
 
 def test_voice_timing_defaults_and_overrides():
@@ -129,3 +131,46 @@ def test_voice_timing_defaults_and_overrides():
 def test_voice_timing_bounds(env):
     with pytest.raises(ConfigError):
         InterviewConfig.from_env(env)
+
+
+async def test_candidate_qa_has_no_limit_until_the_candidate_is_done():
+    cfg = InterviewConfig.from_env({"SENJIN_MAX_QUESTIONS": "2"})
+    llm = FakeLLM([])
+    session = InterviewSession(llm, state=cfg.state(), tools=Tools(), prefetch=True)
+    async for _ in session.open():
+        pass
+    while session.state.phase.value != "candidate_qa":
+        async for _ in session.respond("an answer"):
+            pass
+    answered = 0
+    for i in range(25):  # far more than any old cap
+        async for _ in session.respond(f"What about thing number {i}?"):
+            pass
+        assert session.state.phase.value == "candidate_qa" and not session.finished
+        answered += 1
+    assert answered == 25
+    async for _ in session.respond("No, that's all, thank you."):
+        pass
+    assert session.state.phase.value == "signoff" and session.finished
+
+
+@pytest.mark.parametrize(
+    "text, done",
+    [
+        ("No, I'm good.", True),
+        ("Nope, that was it.", True),
+        ("Thanks, that's all.", True),
+        ("No questions.", True),
+        ("Okay, thank you.", True),
+        ("No, but what about the team size?", False),
+        ("Thanks. One more question.", False),
+        ("Actually, tell me about the on-call rotation", False),
+        ("Is there a bonus?", False),
+        ("What is the salary range for this role at this level?", False),
+    ],
+)
+def test_done_detector_only_fires_when_the_candidate_is_really_done(text, done):
+    session = InterviewSession(FakeLLM([]))
+    session.state.phase = Phase.CANDIDATE_QA
+    session.state.turns_in_phase = 1
+    assert session._candidate_is_done(text) is done
