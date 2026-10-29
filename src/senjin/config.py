@@ -1,5 +1,7 @@
 """Interview limits, managed through environment variables.
 
+Settings can also be kept in a .env file (see .env.example); exported variables win over it.
+
 SENJIN_MAX_QUESTIONS     questions asked in the background + technical parts (default 5, 2 to 30)
 SENJIN_RESUME_QUESTIONS  how many of those are about the resume (default: 40%, at least 1)
 SENJIN_MAX_MINUTES       time box for the whole interview (default 45)
@@ -15,14 +17,59 @@ runs out, or the candidate goes silent.
 
 import math
 import os
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
+from pathlib import Path
 
 from senjin.interview.state import DEFAULT_BUDGETS, Budget, InterviewState, Phase
 
 
 class ConfigError(ValueError):
     pass
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _parse_env_line(line: str) -> tuple[str, str] | None:
+    line = line.strip()
+    if not line or line.startswith("#") or "=" not in line:
+        return None
+    if line.startswith("export "):
+        line = line[len("export ") :]
+    key, _, value = line.partition("=")
+    key, value = key.strip(), value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        value = value[1:-1]
+    elif " #" in value:  # inline comment on an unquoted value
+        value = value.split(" #", 1)[0].rstrip()
+    return key, value
+
+
+def load_env_file(paths: Sequence[Path] | None = None) -> dict[str, str]:
+    """Read SENJIN_* settings from a .env file into os.environ. Returns what was set.
+
+    The first file found wins: `$SENJIN_ENV_FILE` (empty value disables .env), else `.env` in the
+    current directory, else `.env` in the project root. Values already in the environment are
+    never overwritten, so a variable exported in the shell beats the file. Only SENJIN_* keys
+    are read.
+    """
+    if paths is None:
+        chosen = os.environ.get("SENJIN_ENV_FILE")
+        if chosen is not None:
+            paths = [Path(chosen)] if chosen else []
+        else:
+            paths = [Path.cwd() / ".env", PROJECT_ROOT / ".env"]
+    loaded: dict[str, str] = {}
+    for path in paths:
+        if not path.is_file():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            parsed = _parse_env_line(line)
+            if parsed and parsed[0].startswith("SENJIN_") and parsed[0] not in os.environ:
+                os.environ[parsed[0]] = loaded[parsed[0]] = parsed[1]
+        break
+    return loaded
 
 
 def exit_on_config_error(main):
@@ -63,7 +110,9 @@ class InterviewConfig:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "InterviewConfig":
-        env = os.environ if env is None else env
+        if env is None:
+            load_env_file()
+            env = os.environ
         questions = int(_number(env, "SENJIN_MAX_QUESTIONS", 5, 2, 30))
         resume = None
         if env.get("SENJIN_RESUME_QUESTIONS", "").strip():

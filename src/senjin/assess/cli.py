@@ -14,6 +14,7 @@ from senjin.assess.judge import (
     to_markdown,
 )
 from senjin.assess.redact import names_from_dir
+from senjin.config import load_env_file
 from senjin.mcp_server.store import load_questions
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -27,6 +28,7 @@ async def run(
     names: list[str] | None = None,
     redact: bool = True,
 ) -> Path:
+    load_env_file()
     rows = load_rows(path)
     ids = asked_question_ids(rows)
     rubrics = {q.id: q.rubric for q in load_questions(bank) if q.id in ids}

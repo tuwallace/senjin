@@ -47,6 +47,14 @@ The candidate's own Q&A has no limit: Sen keeps answering until the candidate sa
 
 The filler clip fills dead air: the clips are recorded with Piper at startup, play only when the reply is slow, never twice in a row, and are not part of what the model remembers (the transcript logs them as `filler` rows). Flags: `--silence-ms`, `--filler-ms` on `senjin-voice run`, `senjin-voice simulate` and `senjin-meet run`; `senjin-voice report` shows how often the filler played.
 
+Keep your own settings between runs in a `.env` file (git-ignored) at the repo root:
+
+```bash
+cp .env.example .env        # then uncomment and edit the lines you want
+```
+
+Precedence, highest first: command-line flags, variables exported in your shell, `.env`, built-in defaults. Only `SENJIN_*` names are read from `.env`; `OLLAMA_HOST` must still be exported. The file is looked up in the current directory, then the repo root. Point at another file with `SENJIN_ENV_FILE=path`, or set `SENJIN_ENV_FILE=` (empty) to ignore `.env` files.
+
 Bad values stop the program with a message naming the variable. Every `chat`, `voice run` and `meet run` prints the plan when it starts, for example `Interview plan: 5 questions (2 background + 3 technical)...`. Settings live in `src/senjin/config.py`.
 
 ## Phase 0: Repo and tooling

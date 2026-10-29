@@ -14,4 +14,4 @@ Local AI technical interviewer (Google Meet bot). Plan: `docs/ROADMAP.md`. Spec:
 - Tests must not call Ollama or touch audio devices; use fakes. CI runs no model calls.
 - `data/` is git-ignored (transcripts, resumes, HF cache). Never commit interview data.
 - Work phase by phase per the roadmap; tag each phase `v0.N`.
-- Interview limits come from `SENJIN_*` environment variables (`src/senjin/config.py`; default 5 questions). Flags override them. See `docs/COMMANDS.md`.
+- Interview limits come from `SENJIN_*` environment variables (`src/senjin/config.py`; default 5 questions). Flags override them; a git-ignored `.env` (see `.env.example`) keeps them between runs, and exported variables beat it. See `docs/COMMANDS.md`.

@@ -174,3 +174,74 @@ def test_done_detector_only_fires_when_the_candidate_is_really_done(text, done):
     session.state.phase = Phase.CANDIDATE_QA
     session.state.turns_in_phase = 1
     assert session._candidate_is_done(text) is done
+
+
+@pytest.fixture
+def isolated_environ(monkeypatch):
+    """load_env_file writes to os.environ; give the test its own copy so nothing leaks."""
+    import os
+
+    monkeypatch.setattr(os, "environ", os.environ.copy())
+    for key in [k for k in os.environ if k.startswith("SENJIN_") and k != "SENJIN_ENV_FILE"]:
+        del os.environ[key]
+
+
+def write_env(tmp_path, text):
+    path = tmp_path / ".env"
+    path.write_text(text)
+    return path
+
+
+def test_dotenv_values_are_loaded(tmp_path, isolated_environ):
+    import os
+
+    from senjin.config import load_env_file
+
+    path = write_env(
+        tmp_path,
+        '# a comment\n\nSENJIN_MAX_QUESTIONS=7\nexport SENJIN_SILENCE_MS="1200"\n'
+        "SENJIN_FILLER_MS='0'\nSENJIN_MAX_MINUTES=30 # half an hour\n"
+        "OTHER_THING=ignored\nnot a pair\n",
+    )
+    loaded = load_env_file([path])
+    assert loaded == {
+        "SENJIN_MAX_QUESTIONS": "7",
+        "SENJIN_SILENCE_MS": "1200",
+        "SENJIN_FILLER_MS": "0",
+        "SENJIN_MAX_MINUTES": "30",
+    }
+    cfg = InterviewConfig.from_env(loaded)
+    assert (cfg.max_questions, cfg.silence_ms, cfg.filler_ms, cfg.max_minutes) == (7, 1200, 0, 30)
+    assert "OTHER_THING" not in os.environ
+
+
+def test_exported_variables_beat_the_dotenv_file(tmp_path, isolated_environ, monkeypatch):
+    from senjin.config import load_env_file
+
+    monkeypatch.setenv("SENJIN_MAX_QUESTIONS", "3")
+    path = write_env(tmp_path, "SENJIN_MAX_QUESTIONS=9\nSENJIN_SILENCE_MS=1500\n")
+    assert load_env_file([path]) == {"SENJIN_SILENCE_MS": "1500"}
+    assert InterviewConfig.from_env().max_questions == 3  # the shell value stayed
+
+
+def test_dotenv_feeds_the_default_config_and_can_be_disabled(
+    tmp_path, isolated_environ, monkeypatch
+):
+    path = write_env(tmp_path, "SENJIN_MAX_QUESTIONS=8\n")
+    monkeypatch.setenv("SENJIN_ENV_FILE", str(path))
+    assert InterviewConfig.from_env().max_questions == 8
+    monkeypatch.delenv("SENJIN_MAX_QUESTIONS")
+    monkeypatch.setenv("SENJIN_ENV_FILE", "")  # empty = ignore .env files
+    assert InterviewConfig.from_env().max_questions == 5
+
+
+def test_dotenv_bad_value_is_reported_by_name(tmp_path, isolated_environ, monkeypatch):
+    monkeypatch.setenv("SENJIN_ENV_FILE", str(write_env(tmp_path, "SENJIN_SILENCE_MS=fast\n")))
+    with pytest.raises(ConfigError, match="SENJIN_SILENCE_MS"):
+        InterviewConfig.from_env()
+
+
+def test_missing_dotenv_is_fine(tmp_path):
+    from senjin.config import load_env_file
+
+    assert load_env_file([tmp_path / "nope.env"]) == {}
