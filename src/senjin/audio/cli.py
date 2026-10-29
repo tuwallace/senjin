@@ -68,6 +68,8 @@ async def run(args) -> None:
     player = Player(tts.sample_rate)
     async with AsyncExitStack() as stack:
         env = {**os.environ, "SENJIN_NOTES_PATH": str(out.with_suffix(".notes.jsonl"))}
+        if args.candidate_dir:
+            env["SENJIN_CANDIDATE_DIR"] = str(args.candidate_dir)
         tools = FilteredTools(
             await stack.enter_async_context(open_mcp_tools(env=env)), VOICE_HIDDEN
         )
@@ -192,6 +194,9 @@ def main() -> None:
     run_p = sub.choices["run"]
     run_p.add_argument("--model", default=DEFAULT_MODEL)
     run_p.add_argument("--exemplars", type=Path)
+    run_p.add_argument(
+        "--candidate-dir", type=Path, help="folder with resume.md and job_description.md"
+    )
     run_p.add_argument(
         "--no-barge-in", action="store_true", help="use with speakers, not headphones"
     )

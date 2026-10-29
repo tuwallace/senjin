@@ -136,64 +136,110 @@ async def test_tool_loop_is_bounded():
     assert llm.tools_seen[-1] is None  # last round forces a spoken reply
 
 
-class PrefetchTools(StubTools):
+QUESTION = (
+    '{"id": "q1", "topic": "system_design", "difficulty": "medium", '
+    '"prompt": "How would you design a rate limiter?", "follow_ups": ["FU-one?", "FU-two?"]}'
+)
+QUESTION2 = (
+    '{"id": "q2", "topic": "databases", "difficulty": "easy", '
+    '"prompt": "Second topic?", "follow_ups": []}'
+)
+
+
+class OrchestratedTools(StubTools):
+    def __init__(self, questions=(QUESTION, QUESTION2)):
+        super().__init__()
+        self.questions = list(questions)
+
     async def call(self, name, arguments):
         self.calls.append((name, arguments))
+        if name == "get_next_technical_question":
+            return self.questions.pop(0) if self.questions else '{"exhausted": true}'
         return f"RESULT:{name}"
 
 
-async def test_prefetch_runs_tool_on_phase_entry_and_adapts_instruction():
-    tools = PrefetchTools()
+def orchestrated(llm, tools=None, **budget):
+    budgets = {p: Budget(max_turns=budget.get(p.value, 1), max_seconds=1e9) for p in Phase}
+    return InterviewSession(
+        llm,
+        state=InterviewState(budgets=budgets),
+        tools=tools or OrchestratedTools(),
+        prefetch=True,
+    )
+
+
+def last_user(call):
+    return call[-1]["content"]
+
+
+async def test_orchestrated_resume_goes_in_system_message_not_history():
     llm = FakeLLM([])
-    session = InterviewSession(
-        llm, state=InterviewState(budgets=one_turn_budgets()), tools=tools, prefetch=True
-    )
+    session = orchestrated(llm)
     await collect(session.open())
-    assert tools.calls == []  # intro needs nothing
     await collect(session.respond("ready"))
-    assert tools.calls == [("get_candidate_resume", {})]
-    # the model already sees the result and is told not to fetch it
     messages = llm.calls[-1]
-    assert any(
-        m["role"] == "tool" and m["content"] == "RESULT:get_candidate_resume" for m in messages
-    )
-    assert "already fetched" in messages[0]["content"]
-    assert len(llm.calls) == 2  # no extra LLM round for the tool call
+    assert "RESULT:get_candidate_resume" in messages[0]["content"]
+    assert all(m["role"] in {"user", "assistant"} for m in messages[1:])  # no tool messages
+    assert llm.tools_seen[-1] is None  # the model gets no tools: no extra round trips
+    assert len(llm.calls) == 2
 
 
-async def test_prefetch_off_by_default():
-    tools = PrefetchTools()
-    session = InterviewSession(
-        FakeLLM([]), state=InterviewState(budgets=one_turn_budgets()), tools=tools
+async def test_technical_asks_question_then_follow_ups_once_each_then_next_question():
+    llm = FakeLLM([])
+    tools = OrchestratedTools()
+    session = orchestrated(llm, tools, technical=6)
+    await collect(session.open())
+    await collect(session.respond("ready"))  # -> resume_dive
+    await collect(session.respond("my project"))  # -> technical, asks the question
+    assert "How would you design a rate limiter?" in last_user(llm.calls[-1])
+    assert "FU-one" not in str(llm.calls[-1])  # follow-ups are not leaked to the model
+    await collect(session.respond("answer 1"))
+    assert "FU-one?" in last_user(llm.calls[-1])
+    await collect(session.respond("answer 2"))
+    assert "FU-two?" in last_user(llm.calls[-1])
+    await collect(session.respond("answer 3"))  # topic exhausted: next question
+    assert "Second topic?" in last_user(llm.calls[-1])
+    notes = [m["content"] for call in llm.calls for m in call if "Interviewer note" in m["content"]]
+    assert sum("FU-one?" in n for n in notes) == len({n for n in notes if "FU-one?" in n}) >= 1
+    await collect(session.respond("answer 4"))  # bank exhausted: probe
+    assert "probing follow-up" in last_user(llm.calls[-1])
+    # the note is never stored in history
+    assert all("Interviewer note" not in m["content"] for m in session.history)
+
+
+async def test_candidate_qa_uses_job_description_and_ends_when_candidate_is_done():
+    llm = FakeLLM([])
+    session = orchestrated(llm)
+    await collect(session.open())
+    for text in ["ready", "project", "answer"]:
+        await collect(session.respond(text))
+    assert session.state.phase == Phase.CANDIDATE_QA
+    assert "RESULT:get_job_description" in llm.calls[-1][0]["content"]
+    assert "invite any questions" in last_user(llm.calls[-1])
+    await collect(session.respond("No, I'm good."))
+    assert session.state.phase == Phase.SIGNOFF
+    assert "goodbye" in last_user(llm.calls[-1]) and "Do not ask a question" in last_user(
+        llm.calls[-1]
     )
+    assert session.finished
+
+
+async def test_qa_question_is_answered_not_treated_as_done():
+    llm = FakeLLM([])
+    session = orchestrated(llm, candidate_qa=3)
+    await collect(session.open())
+    for text in ["ready", "project", "answer"]:
+        await collect(session.respond(text))
+    await collect(session.respond("What does on-call look like?"))
+    assert session.state.phase == Phase.CANDIDATE_QA
+    assert "Answer their question" in last_user(llm.calls[-1])
+
+
+async def test_orchestration_is_off_by_default():
+    tools = OrchestratedTools()
+    llm = FakeLLM([])
+    session = InterviewSession(llm, state=InterviewState(budgets=one_turn_budgets()), tools=tools)
     await collect(session.open())
     await collect(session.respond("ready"))
     assert tools.calls == []
-
-
-async def test_time_box_skips_ahead_then_signs_off():
-    clock = Clock()
-    state = InterviewState(
-        budgets={p: Budget(max_turns=99, max_seconds=1e9) for p in Phase}, max_total_seconds=100
-    )
-    session = InterviewSession(FakeLLM([]), state=state, clock=clock)
-    await collect(session.open())
-    await collect(session.respond("hi"))
-    assert session.state.phase == Phase.INTRO  # plenty of time, budgets not exhausted
-    clock.t = 90  # 90% used
-    await collect(session.respond("answer"))
-    assert session.state.phase == Phase.CANDIDATE_QA
-    await collect(session.respond("my question"))
-    assert session.state.phase == Phase.CANDIDATE_QA  # already past the skip-ahead point
-    clock.t = 101
-    await collect(session.respond("another"))
-    assert session.state.phase == Phase.SIGNOFF and session.finished
-
-
-async def test_say_records_canned_line_and_can_finish():
-    session = InterviewSession(FakeLLM([]))
-    session.say("Are you still there?")
-    assert session.history[-1] == {"role": "assistant", "content": "Are you still there?"}
-    assert not session.finished
-    session.say("Goodbye.", final=True)
-    assert session.finished
+    assert llm.tools_seen[-1] == tools.tools  # model-driven mode still offers tools

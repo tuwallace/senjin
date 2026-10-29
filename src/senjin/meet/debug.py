@@ -13,19 +13,7 @@ from senjin.audio.devices import mic_frames
 from senjin.meet.audio import find_bridge
 from senjin.meet.joiner import MeetBot
 
-INSPECT_JS = """() => {
-  const els = [];
-  const walk = root => {
-    root.querySelectorAll('audio, video').forEach(e => els.push({
-      tag: e.tagName, sinkId: e.sinkId, paused: e.paused, muted: e.muted,
-      volume: e.volume, audioTracks: e.srcObject ? e.srcObject.getAudioTracks().length : 0,
-      inDom: e.isConnected,
-    }));
-    root.querySelectorAll('*').forEach(n => { if (n.shadowRoot) walk(n.shadowRoot); });
-  };
-  walk(document);
-  return {ids: window.__senjin && window.__senjin.ids, elements: els};
-}"""
+INSPECT_JS = "() => window.__senjinInspect ? window.__senjinInspect() : null"
 
 
 def rms(frames: list[np.ndarray]) -> float:
@@ -54,10 +42,15 @@ async def run_debug(url: str, speak: str, hear: str, seconds: float, log=print) 
             info = await bot.page.evaluate(INSPECT_JS)
             log(f"hear-device level {level:.4f}   people={await bot.participant_count()}")
             log(f"  chosen devices: {info['ids']}")
+            if info is None:
+                log("  routing script not loaded")
+                continue
             for el in info["elements"]:
-                log(f"  {el}")
-            if not info["elements"]:
-                log("  no <audio>/<video> elements found")
+                log(f"  element {el}")
+            for ctx in info["contexts"]:
+                log(f"  audio context {ctx}")
+            if not info["elements"] and not info["contexts"]:
+                log("  no media elements or audio contexts seen")
         recorder.cancel()
         await asyncio.gather(recorder, return_exceptions=True)
     finally:

@@ -1,7 +1,7 @@
 - id: be-rate-limiter
   topic: system_design
   difficulty: medium
-  prompt: Design a rate limiter for a public API that serves many customers. Walk me through your approach.
+  prompt: Imagine you are building a rate limiter for a public API that serves many customers. How would you design it?
   follow_ups:
     - How would this work across multiple servers?
     - What happens when your shared store is unavailable?
@@ -13,7 +13,7 @@
 - id: be-url-shortener
   topic: system_design
   difficulty: easy
-  prompt: Design a URL shortening service. What are the main components?
+  prompt: Suppose you were asked to build a URL shortening service. What would the main components be?
   follow_ups:
     - How do you generate the short codes without collisions?
     - How would you scale reads?
@@ -24,7 +24,7 @@
 - id: be-event-pipeline
   topic: system_design
   difficulty: hard
-  prompt: Design a pipeline that ingests ten thousand events per second and makes them queryable within a minute.
+  prompt: Say you need to ingest ten thousand events per second and make them queryable within a minute. How would you design that pipeline?
   follow_ups:
     - How do you handle duplicates and late events?
     - How do you guarantee ordering where it matters?
@@ -35,7 +35,7 @@
 - id: al-dedupe-stream
   topic: algorithms
   difficulty: easy
-  prompt: Given a long stream of integers, how would you return the first value that appears twice?
+  prompt: You are reading a long stream of integers. How would you find the first value that appears twice?
   follow_ups:
     - What is the memory cost?
     - What if the stream is too large to hold in memory?
@@ -46,7 +46,7 @@
 - id: al-lru-cache
   topic: algorithms
   difficulty: medium
-  prompt: Describe how you would implement an LRU cache with constant-time get and put.
+  prompt: How would you implement an LRU cache with constant-time get and put?
   follow_ups:
     - How does it change if it must be thread-safe?
     - How would you add per-entry expiry?
@@ -57,7 +57,7 @@
 - id: al-merge-intervals
   topic: algorithms
   difficulty: medium
-  prompt: You have a list of meeting time intervals. How would you find the minimum number of rooms needed?
+  prompt: You are given a list of meeting time intervals. How would you work out the minimum number of rooms needed?
   follow_ups:
     - What is the complexity of your approach?
     - How would you handle intervals arriving online?
@@ -68,7 +68,7 @@
 - id: db-slow-query
   topic: databases
   difficulty: medium
-  prompt: A production query that used to take fifty milliseconds now takes ten seconds. How do you investigate?
+  prompt: A production query that used to take fifty milliseconds now takes ten seconds. How would you investigate?
   follow_ups:
     - What would make an index not get used?
     - How do you fix it without downtime?
@@ -79,7 +79,7 @@
 - id: db-consistency
   topic: databases
   difficulty: hard
-  prompt: Two services must update their own databases as part of one business action. How do you keep them consistent?
+  prompt: Two services must each update their own database as part of one business action. How would you keep them consistent?
   follow_ups:
     - What are the failure cases of your approach?
     - When would you accept eventual consistency?
@@ -90,7 +90,7 @@
 - id: eng-incident
   topic: engineering_practice
   difficulty: easy
-  prompt: Tell me about debugging a production incident. How do you approach one from the first alert?
+  prompt: Think about a production incident you have handled. How do you approach one, starting from the first alert?
   follow_ups:
     - How do you communicate during it?
     - What do you do afterward?

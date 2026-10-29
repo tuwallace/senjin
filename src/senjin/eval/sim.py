@@ -69,6 +69,7 @@ async def run_simulation(
     out: Path,
     exemplars: ExemplarIndex | None = None,
     quick: bool = False,
+    orchestrate: bool = False,
     max_exchanges: int = 40,
 ) -> Path:
     candidate_dir = ROOT / "examples/candidate"
@@ -83,6 +84,7 @@ async def run_simulation(
             state=quick_state() if quick else None,
             tools=tools,
             exemplars=exemplars,
+            prefetch=orchestrate,
         )
         said = "".join([c async for c in session.open()])
         for _ in range(max_exchanges):
@@ -99,11 +101,14 @@ def main() -> None:
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--exemplars", type=Path, help="exemplar JSONL (omit to run without)")
     parser.add_argument("--quick", action="store_true", help="short phase budgets (about 9 turns)")
+    parser.add_argument(
+        "--orchestrate", action="store_true", help="code-driven questions, as in voice and Meet"
+    )
     parser.add_argument("--out", type=Path)
     args = parser.parse_args()
     out = args.out or Path("data/sessions") / f"sim-{args.persona}-{time.strftime('%H%M%S')}.jsonl"
     index = ExemplarIndex.load(args.exemplars) if args.exemplars else None
-    asyncio.run(run_simulation(args.persona, args.model, out, index, args.quick))
+    asyncio.run(run_simulation(args.persona, args.model, out, index, args.quick, args.orchestrate))
     print(out)
 
 

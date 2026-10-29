@@ -185,3 +185,31 @@ async def test_real_bot_rejoins_a_dropping_call(server):
         assert result == "ended" and joins == 3  # first join + two rejoins
     finally:
         await bot.close()
+
+
+@needs_chrome
+async def test_detached_elements_and_audio_contexts_are_routed(server):
+    bot = make_bot(
+        mic_name="Fake Audio Input 2",
+        speaker_name="Fake Audio Output 2",
+        extra_args=["--use-fake-device-for-media-stream"],
+    )
+    page = await bot.start()
+    try:
+        await page.goto(f"{server}/mock_meet.html")
+        result = await page.evaluate(
+            """async () => {
+              const s = await navigator.mediaDevices.getUserMedia({audio: true});
+              const detached = new Audio();          // never added to the page
+              detached.srcObject = s;
+              const ctx = new AudioContext();        // how a page can bypass media elements
+              await new Promise(r => setTimeout(r, 1800));
+              const info = window.__senjinInspect();
+              return {spk: info.ids.spk, el: detached.sinkId, ctx: ctx.sinkId, info};
+            }"""
+        )
+        assert result["spk"] and result["el"] == result["spk"]
+        assert result["ctx"] == result["spk"]
+        assert result["info"]["elements"] and result["info"]["contexts"]
+    finally:
+        await bot.close()

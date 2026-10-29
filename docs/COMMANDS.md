@@ -173,6 +173,7 @@ Run an unattended interview with a simulated candidate (`strong`, `average` or `
 uv run senjin-sim --persona average --quick                                    # about 9 turns, no exemplars
 uv run senjin-sim --persona strong --quick --exemplars data/exemplars/moves.jsonl
 uv run senjin-sim --persona weak                                               # full-length interview
+uv run senjin-sim --persona average --quick --orchestrate                      # code-driven questions, as in voice and Meet
 ```
 
 Each run prints the transcript path (under `data/sessions/`), which you can score with `senjin-assess`.
@@ -288,6 +289,7 @@ uv run senjin-meet run "https://meet.google.com/xxx-xxxx-xxx"
 Options:
 
 ```bash
+uv run senjin-meet run URL --candidate-dir data/candidates/jane   # real resume.md + job_description.md (default: the sample Jane Doe)
 uv run senjin-meet run URL --wait-candidate 120      # seconds to wait for a second participant before starting
 uv run senjin-meet run URL --admit-timeout 600       # seconds to wait in the lobby
 uv run senjin-meet run URL --silence-ms 600          # end-of-turn silence

@@ -43,20 +43,56 @@ TEMPLATE = r"""
     return origGUM(constraints);
   };
 
-  async function routeOutputs() {
+  // Meet's remote audio may sit on detached elements or in an AudioContext, so track both.
+  const tracked = new Set();
+  const contexts = new Set();
+  const routeOne = async el => {
     const {spk} = await resolve();
-    if (!spk) return;
-    for (const el of document.querySelectorAll('audio, video')) {
-      if (el.sinkId !== spk && el.setSinkId) { try { await el.setSinkId(spk); } catch (e) {} }
-    }
+    if (spk && el.setSinkId && el.sinkId !== spk) { try { await el.setSinkId(spk); } catch (e) {} }
+  };
+  const routeContext = async ctx => {
+    const {spk} = await resolve();
+    if (spk && ctx.setSinkId && ctx.sinkId !== spk) { try { await ctx.setSinkId(spk); } catch (e) {} }
+  };
+  async function routeOutputs() {
+    for (const el of document.querySelectorAll('audio, video')) tracked.add(el);
+    for (const el of tracked) await routeOne(el);
+    for (const ctx of contexts) await routeContext(ctx);
+  }
+
+  const srcDesc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'srcObject');
+  if (srcDesc) {
+    Object.defineProperty(HTMLMediaElement.prototype, 'srcObject', {
+      configurable: true, enumerable: srcDesc.enumerable, get: srcDesc.get,
+      set(value) { tracked.add(this); srcDesc.set.call(this, value); routeOne(this); },
+    });
   }
   const origPlay = HTMLMediaElement.prototype.play;
   HTMLMediaElement.prototype.play = async function (...args) {
-    const {spk} = await resolve();
-    if (spk && this.setSinkId && this.sinkId !== spk) { try { await this.setSinkId(spk); } catch (e) {} }
+    tracked.add(this);
+    await routeOne(this);
     return origPlay.apply(this, args);
   };
-  setInterval(routeOutputs, 1000);  // catches autoplay elements Meet creates for remote audio
+  for (const name of ['AudioContext', 'webkitAudioContext']) {
+    const Orig = window[name];
+    if (!Orig) continue;
+    window[name] = new Proxy(Orig, {
+      construct(target, args, newTarget) {
+        const ctx = Reflect.construct(target, args, newTarget);
+        contexts.add(ctx);
+        routeContext(ctx);
+        return ctx;
+      },
+    });
+  }
+  window.__senjinInspect = () => ({
+    ids: cached,
+    elements: [...tracked].map(e => ({tag: e.tagName, sinkId: e.sinkId, paused: e.paused,
+      muted: e.muted, audioTracks: e.srcObject && e.srcObject.getAudioTracks ? e.srcObject.getAudioTracks().length : 0,
+      inDom: e.isConnected})),
+    contexts: [...contexts].map(c => ({state: c.state, sinkId: typeof c.sinkId === 'string' ? c.sinkId : 'none-object'})),
+  });
+  setInterval(routeOutputs, 1000);  // catches anything created before a sink was known
 })();
 """
 

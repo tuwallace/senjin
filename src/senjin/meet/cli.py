@@ -55,6 +55,9 @@ def main() -> None:
     run.add_argument("url", help="https://meet.google.com/xxx-xxxx-xxx")
     run.add_argument("--model", default=DEFAULT_MODEL)
     run.add_argument("--exemplars", type=Path)
+    run.add_argument(
+        "--candidate-dir", type=Path, help="folder with resume.md and job_description.md"
+    )
     run.add_argument("--out", type=Path)
     run.add_argument("--admit-timeout", type=float, default=300)
     run.add_argument("--wait-candidate", type=float, default=600)
@@ -107,7 +110,7 @@ def main() -> None:
                     admit_timeout=args.admit_timeout, wait_candidate=args.wait_candidate,
                     silence_ms=args.silence_ms, guest_name=args.guest_name,
                     max_minutes=args.max_minutes, idle_seconds=args.idle_seconds,
-                    exemplars=args.exemplars,
+                    exemplars=args.exemplars, candidate_dir=args.candidate_dir,
                 )
             )  # fmt: skip
             print(f"transcript: {out}")

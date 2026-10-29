@@ -40,6 +40,7 @@ async def run_meet_interview(
     idle_seconds: float = 25,
     guest_name: str = "Sen (AI interviewer)",
     exemplars: Path | None = None,
+    candidate_dir: Path | None = None,
     log=print,
 ) -> Path:
     bridge = find_bridge(speak=speak, hear=hear)  # fail fast, before opening a browser
@@ -61,6 +62,8 @@ async def run_meet_interview(
                 log("Candidate did not arrive (or participant count unreadable); starting anyway.")
 
             env = {**os.environ, "SENJIN_NOTES_PATH": str(out.with_suffix(".notes.jsonl"))}
+            if candidate_dir:
+                env["SENJIN_CANDIDATE_DIR"] = str(candidate_dir)
             tools = FilteredTools(
                 await stack.enter_async_context(open_mcp_tools(env=env)), {"record_note"}
             )
