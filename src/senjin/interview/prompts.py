@@ -56,3 +56,9 @@ def phase_message(phase: Phase, *, entering: bool) -> str:
 
 
 KICKOFF = "[The call has connected and the candidate is present. Begin the interview.]"
+
+EXEMPLAR_HEADER = (
+    "\n\nExamples of how skilled interviewers follow up. Copy the manner (a brief "
+    "acknowledgement, then one open question about a specific thing the person said), "
+    "not the topic or the words:\n\n"
+)

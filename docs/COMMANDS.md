@@ -143,14 +143,50 @@ How it stays honest: output is schema-constrained, retried once if invalid, and 
 
 Unit tests (fake judge, no Ollama): `uv run pytest tests/test_assess.py`
 
-## Phase 4: Anthropic dataset (planned)
+## Phase 4: Anthropic dataset
+
+The dataset (1,250 research interviews, MIT/CC-BY) is used for interviewer craft only: follow-up style, not technical content or scoring.
+
+Download (about 11 MB into `data/hf_cache/`, git-ignored) and inspect:
 
 ```bash
-uv run senjin-data fetch                # download Anthropic/AnthropicInterviewer into data/hf_cache/
-uv run senjin-data moves                # extract and cluster interviewer moves
-uv run senjin-eval style                # style metric: baseline vs. current interviewer
-uv run senjin-sim --persona strong      # run an unattended interview with a simulated candidate
+uv run senjin-data fetch
+uv run senjin-data stats        # transcripts per split and interviewer move counts
 ```
+
+Build the exemplar library (needs `ollama pull nomic-embed-text`; writes `data/exemplars/moves.jsonl`):
+
+```bash
+uv run senjin-data moves                 # 40 exemplars each of probe, clarify, reflect
+uv run senjin-data moves --per-kind 80   # a bigger library
+```
+
+Use exemplars in an interview (retrieved per turn in the background and technical phases):
+
+```bash
+uv run senjin-chat --exemplars data/exemplars/moves.jsonl
+```
+
+Run an unattended interview with a simulated candidate (`strong`, `average` or `weak`):
+
+```bash
+uv run senjin-sim --persona average --quick                                    # about 9 turns, no exemplars
+uv run senjin-sim --persona strong --quick --exemplars data/exemplars/moves.jsonl
+uv run senjin-sim --persona weak                                               # full-length interview
+```
+
+Each run prints the transcript path (under `data/sessions/`), which you can score with `senjin-assess`.
+
+Compare interviewer style (single question, open-ended, ties to the candidate's answer, speakable, length):
+
+```bash
+uv run python -m senjin.eval.style                                  # dataset baseline
+uv run python -m senjin.eval.style data/sessions/a.jsonl data/sessions/b.jsonl
+```
+
+Tests: `uv run pytest tests/test_dataset.py`
+
+Attribution: Anthropic Interviewer transcripts, https://huggingface.co/datasets/Anthropic/AnthropicInterviewer. Raw data and exemplars stay in `data/` and are not committed.
 
 ## Phase 5: Voice loop on the laptop (planned)
 

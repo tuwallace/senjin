@@ -3,7 +3,8 @@
 import time
 from collections.abc import AsyncIterator, Callable
 
-from senjin.interview.prompts import KICKOFF, SYSTEM_PROMPT, phase_message
+from senjin.interview.exemplars import ExemplarProvider
+from senjin.interview.prompts import EXEMPLAR_HEADER, KICKOFF, SYSTEM_PROMPT, phase_message
 from senjin.interview.state import InterviewState
 from senjin.interview.transcript import TranscriptLog
 from senjin.llm.client import LLMClient, Message, ToolCall
@@ -20,7 +21,9 @@ class InterviewSession:
         state: InterviewState | None = None,
         clock: Callable[[], float] = time.monotonic,
         tools: ToolRunner | None = None,
+        exemplars: ExemplarProvider | None = None,
     ) -> None:
+        self.exemplars = exemplars
         self.llm = llm
         self.tools = tools
         self.log = log
@@ -46,14 +49,20 @@ class InterviewSession:
             if self.state.advance(self.clock()) is None:
                 return
             self._entering = True
-        async for chunk in self._reply():
+        examples: list[str] = []
+        if self.exemplars:
+            examples = await self.exemplars.examples(candidate_text, self.state.phase)
+        async for chunk in self._reply(examples):
             yield chunk
 
-    async def _reply(self) -> AsyncIterator[str]:
+    async def _reply(self, examples: list[str] | None = None) -> AsyncIterator[str]:
         # One system message: some chat templates (qwen) mishandle several or trailing ones.
         phase = phase_message(self.state.phase, entering=self._entering)
         self._entering = False
-        system = {"role": "system", "content": f"{SYSTEM_PROMPT}\nCurrent instruction: {phase}"}
+        content = f"{SYSTEM_PROMPT}\nCurrent instruction: {phase}"
+        if examples:
+            content += EXEMPLAR_HEADER + "\n\n".join(examples)
+        system = {"role": "system", "content": content}
         tools = self.tools.tools if self.tools else None
         parts: list[str] = []
         for _ in range(MAX_TOOL_ROUNDS + 1):
