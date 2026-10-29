@@ -53,18 +53,31 @@ class InterviewSession:
     async def respond(self, candidate_text: str) -> AsyncIterator[str]:
         """Record the candidate's turn, advance the phase if due, stream the reply."""
         self._record("user", candidate_text)
-        if self.state.due_to_advance(self.clock()):
-            if self.state.advance(self.clock()) is None:
+        now = self.clock()
+        if target := self.state.wrap_up_target(now):
+            self.state.jump(target, now)
+            await self._enter_phase()
+        elif self.state.due_to_advance(now):
+            if self.state.advance(now) is None:
                 return
-            self._prefetched = False
-            if self.prefetch and self.state.phase in PREFETCH:
-                await self._run_tools(list(PREFETCH[self.state.phase]))
-                self._prefetched = True
+            await self._enter_phase()
         examples: list[str] = []
         if self.exemplars:
             examples = await self.exemplars.examples(candidate_text, self.state.phase)
         async for chunk in self._reply(examples):
             yield chunk
+
+    async def _enter_phase(self) -> None:
+        self._prefetched = False
+        if self.prefetch and self.state.phase in PREFETCH:
+            await self._run_tools(list(PREFETCH[self.state.phase]))
+            self._prefetched = True
+
+    def say(self, text: str, *, final: bool = False) -> None:
+        """Record a fixed line the orchestrator spoke itself (watchdog prompts, apologies)."""
+        self._record("assistant", text)
+        if final:
+            self.state.finished = True
 
     async def _reply(self, examples: list[str] | None = None) -> AsyncIterator[str]:
         # One system message: some chat templates (qwen) mishandle several or trailing ones.

@@ -8,8 +8,10 @@ from typing import Protocol
 import ollama
 from pydantic import ValidationError
 
+from senjin.assess.redact import redact_rows
 from senjin.assess.schema import Assessment, Report
 from senjin.assess.verify import verify
+from senjin.llm.client import DEFAULT_HOST
 
 DEFAULT_JUDGE = "qwen2.5:32b-instruct-q4_K_M"
 
@@ -39,7 +41,7 @@ class JudgeLLM(Protocol):
 
 
 class OllamaJudge:
-    def __init__(self, model: str = DEFAULT_JUDGE, host: str = "http://localhost:11434") -> None:
+    def __init__(self, model: str = DEFAULT_JUDGE, host: str = DEFAULT_HOST) -> None:
         self.model = model
         self._client = ollama.AsyncClient(host=host)
 
@@ -90,8 +92,15 @@ def build_prompt(dialogue: str, rubrics: dict[str, list[str]]) -> str:
 
 
 async def assess(
-    rows: list[dict], judge: JudgeLLM, rubrics: dict[str, list[str]] | None = None
+    rows: list[dict],
+    judge: JudgeLLM,
+    rubrics: dict[str, list[str]] | None = None,
+    names: list[str] | None = None,
+    redact: bool = True,
 ) -> Report:
+    """Score a transcript. By default personal cues are removed before the judge sees it."""
+    if redact:
+        rows = redact_rows(rows, names or [])
     dialogue, candidate = render_transcript(rows)
     if not candidate:
         raise AssessmentError("transcript has no candidate turns")

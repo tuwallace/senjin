@@ -50,6 +50,14 @@ def main() -> None:
     run.add_argument("--admit-timeout", type=float, default=300)
     run.add_argument("--wait-candidate", type=float, default=600)
     run.add_argument("--silence-ms", type=int, default=800)
+    run.add_argument("--max-minutes", type=float, default=45, help="time box for the interview")
+    run.add_argument(
+        "--idle-seconds", type=float, default=25, help="silence before a nudge (0 = off)"
+    )
+    run.add_argument(
+        "--assess", action="store_true", help="score the transcript when the call ends"
+    )
+    run.add_argument("--judge", default=None, help="judge model for --assess")
     run.add_argument("--guest-name", default="Sen (AI interviewer)")
     args = parser.parse_args()
 
@@ -77,10 +85,24 @@ def main() -> None:
                     speak=args.speak_device, hear=args.hear_device, out=out,
                     admit_timeout=args.admit_timeout, wait_candidate=args.wait_candidate,
                     silence_ms=args.silence_ms, guest_name=args.guest_name,
+                    max_minutes=args.max_minutes, idle_seconds=args.idle_seconds,
                     exemplars=args.exemplars,
                 )
             )  # fmt: skip
             print(f"transcript: {out}")
+            if args.assess:
+                from senjin.assess.cli import ROOT
+                from senjin.assess.cli import run as assess_run
+                from senjin.assess.judge import DEFAULT_JUDGE
+
+                asyncio.run(
+                    assess_run(
+                        out,
+                        args.judge or DEFAULT_JUDGE,
+                        Path("data/reports"),
+                        ROOT / "question_bank",
+                    )
+                )
     except DeviceError as exc:
         raise SystemExit(f"error: {exc}") from None
 

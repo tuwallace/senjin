@@ -21,6 +21,17 @@ from senjin.audio.tts import TTS, SentenceSplitter
 from senjin.audio.vad import TurnConfig, TurnDetector
 from senjin.interview.session import InterviewSession
 
+IDLE_PROMPTS = ["Are you still there?", "I still can't hear you. Are you able to continue?"]
+GOODBYE_IDLE = (
+    "I haven't heard from you, so I'll end the call here. "
+    "The team will follow up about next steps. Goodbye."
+)
+APOLOGY = "Sorry, I had a technical problem. Could you say that again?"
+GOODBYE_ERRORS = (
+    "I'm having technical difficulties, so I'll end the call here. "
+    "Someone from the team will follow up with you. Goodbye."
+)
+
 
 class AudioOut(Protocol):
     busy: bool
@@ -35,6 +46,9 @@ class AudioOut(Protocol):
 class VoiceConfig:
     barge_in: bool = True
     barge_in_ms: int = 300  # candidate speech needed to cut the interviewer off
+    idle_prompt_s: float | None = 25.0  # silence before "Are you still there?" (None disables)
+    max_idle_prompts: int = 2  # prompts before the call is ended politely
+    max_consecutive_errors: int = 3  # failed replies in a row before the call is ended
 
 
 class VoiceLoop:
@@ -64,6 +78,10 @@ class VoiceLoop:
         self._turn: asyncio.Task | None = None
         self._stt_audio: np.ndarray | None = None
         self._carry: np.ndarray | None = None
+        self._idle_since = clock()
+        self._idle_prompts = 0
+        self._errors_in_row = 0
+        self._recover = False
 
     @property
     def busy(self) -> bool:
@@ -76,6 +94,7 @@ class VoiceLoop:
                 if self.session.finished and not self.busy:
                     break
                 prob = self.vad(frame)
+                await self._watchdog()
                 if self.busy and not self.config.barge_in:
                     self.detector.reset()
                     continue
@@ -100,6 +119,37 @@ class VoiceLoop:
     def _collect_error(self, task: asyncio.Task) -> None:
         if not task.cancelled() and task.exception():
             self.errors.append(task.exception())
+            self._errors_in_row += 1
+            self._recover = True
+
+    async def _watchdog(self) -> None:
+        """Between turns: recover from a failed reply, or nudge a silent candidate."""
+        if self.busy or self.session.finished:
+            return
+        if self._recover:
+            self._recover = False
+            if self._errors_in_row >= self.config.max_consecutive_errors:
+                self._start_turn(self._speak_canned(GOODBYE_ERRORS, final=True))
+            else:
+                self._start_turn(self._speak_canned(APOLOGY))
+            return
+        limit = self.config.idle_prompt_s
+        if limit is None or self.detector.in_speech or self.clock() - self._idle_since < limit:
+            return
+        if self._idle_prompts >= self.config.max_idle_prompts:
+            self._start_turn(self._speak_canned(GOODBYE_IDLE, final=True))
+        else:
+            prompt = IDLE_PROMPTS[min(self._idle_prompts, len(IDLE_PROMPTS) - 1)]
+            self._idle_prompts += 1
+            self._start_turn(self._speak_canned(prompt))
+
+    async def _speak_canned(self, text: str, final: bool = False) -> None:
+        self.player.reset()
+        self.player.enqueue(await self.tts.synth(text), text)
+        self.session.say(text, final=final)
+        self.on_text("interviewer", text)
+        await self.player.wait_idle()
+        self._idle_since = self.clock()
 
     async def _cancel_turn(self) -> None:
         if self._turn and not self._turn.done():
@@ -117,6 +167,7 @@ class VoiceLoop:
     async def _on_utterance(self, audio: np.ndarray) -> None:
         if self.busy:  # speech ended before barge-in fired; treat it as a barge-in now
             await self._interrupt()
+        self._idle_prompts = 0
         if self._carry is not None:
             audio, self._carry = np.concatenate([self._carry, audio]), None
         self._start_turn(self._respond(audio, self.clock()))
@@ -133,6 +184,7 @@ class VoiceLoop:
         rec["text"] = text
         self.on_text("candidate", text)
         await self._speak(self.session.respond(text), rec, t_end)
+        self._errors_in_row = 0
 
     async def _speak(self, stream, rec: dict, t_end: float | None) -> None:
         self.player.reset()
@@ -172,6 +224,7 @@ class VoiceLoop:
             if said:
                 self.on_text("interviewer", " ".join(said))
             self._finish_record(rec, t_end)
+            self._idle_since = self.clock()
 
     def _finish_record(self, rec: dict, t_end: float | None) -> None:
         enqueued = rec.pop("_enqueued_at", None)

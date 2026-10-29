@@ -36,9 +36,11 @@ class InterviewState:
     turns_in_phase: int = 0
     phase_started_at: float = 0.0
     finished: bool = False
+    max_total_seconds: float | None = None  # hard time box for the whole interview
+    started_at: float = 0.0
 
     def start(self, now: float) -> None:
-        self.phase_started_at = now
+        self.started_at = self.phase_started_at = now
 
     def record_interviewer_turn(self) -> None:
         self.turns_in_phase += 1
@@ -60,3 +62,22 @@ class InterviewState:
         self.turns_in_phase = 0
         self.phase_started_at = now
         return self.phase
+
+    def wrap_up_target(self, now: float) -> Phase | None:
+        """Where to jump when the whole-interview time box runs low, or None.
+
+        At 85% of the time box, skip ahead to the candidate's questions; at 100%, sign off.
+        """
+        if self.max_total_seconds is None:
+            return None
+        used = (now - self.started_at) / self.max_total_seconds
+        if used >= 1.0 and self.phase != Phase.SIGNOFF:
+            return Phase.SIGNOFF
+        if used >= 0.85 and ORDER.index(self.phase) < ORDER.index(Phase.CANDIDATE_QA):
+            return Phase.CANDIDATE_QA
+        return None
+
+    def jump(self, phase: Phase, now: float) -> None:
+        self.phase = phase
+        self.turns_in_phase = 0
+        self.phase_started_at = now

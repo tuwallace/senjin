@@ -1,5 +1,6 @@
 """Chat clients. The interviewer depends only on the `LLMClient` protocol."""
 
+import os
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -7,7 +8,7 @@ from typing import Any, Protocol
 import ollama
 
 DEFAULT_MODEL = "qwen3:8b-16k"
-DEFAULT_HOST = "http://localhost:11434"
+DEFAULT_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")  # container-friendly
 
 Message = dict[str, Any]
 

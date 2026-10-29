@@ -46,3 +46,4 @@ class Report(BaseModel):
     verification: Verification
     judge_model: str
     transcript: str
+    redacted: bool = True

@@ -12,7 +12,7 @@ Phases marked **planned** have no code yet; their commands are the intended ones
 | 4 Anthropic dataset | planned | `v0.4` |
 | 5 Voice loop | done | `v0.5` |
 | 6 Google Meet bot | built, not run against real Meet | `v0.6` |
-| 7 Hardening | planned | `v1.0` |
+| 7 Hardening | built; `v1.0` waits for a live dress rehearsal | `v0.7` |
 
 ## Prerequisites (once)
 
@@ -285,12 +285,55 @@ Tests (Chrome required; they are skipped when it is missing): `uv run pytest tes
 
 If joining fails: check `src/senjin/meet/selectors.py` first (Meet changes its labels), then run with a visible window (the default) and watch where it stops.
 
-## Phase 7: Hardening (planned)
+## Phase 7: Hardening
+
+Reliability, built into `senjin-voice run` and `senjin-meet run`:
 
 ```bash
-uv run senjin-report data/sessions/<file>.jsonl      # final Markdown and JSON scorecard
-uv run pytest -m fairness                            # paired-transcript bias checks
+uv run senjin-voice run --max-minutes 30 --idle-seconds 20
+uv run senjin-meet run URL --max-minutes 30 --idle-seconds 20
 ```
+
+- Time box: at 85% of `--max-minutes` the interviewer skips to the candidate's questions; at 100% it signs off. Default 45.
+- Silence watchdog: after `--idle-seconds` of silence (default 25) it says "Are you still there?", then once more, then ends the call politely. Use `--idle-seconds 0` to turn it off.
+- Errors: if a reply fails (for example Ollama stops), it apologizes and asks the candidate to repeat; after 3 failures in a row it ends the call and says someone will follow up.
+- Meet drops: if the call UI disappears and the interview is not finished, the bot rejoins up to 2 times (waiting up to 2 minutes each time), then gives up.
+- Transcripts are written line by line, so a crash keeps everything said so far.
+
+Scorecard (Markdown and JSON in `data/reports/`):
+
+```bash
+uv run senjin-assess data/sessions/<file>.jsonl
+uv run senjin-meet run URL --assess                  # score automatically when the call ends
+```
+
+Personal cues are removed before the judge reads the transcript: the candidate's name (taken from `resume.md`'s first heading, or `--candidate-name "Jane Doe"`), gendered pronouns, and whole sentences about family, age, origin or identity. The reports show the redacted text. To score without redaction (for comparison only):
+
+```bash
+uv run senjin-assess data/sessions/<file>.jsonl --no-redact
+```
+
+Fairness checks:
+
+```bash
+uv run pytest -m fairness                      # offline: redacted paired transcripts are identical
+uv run python -m senjin.eval.fairness          # live: 6 name/cue variants x 2 transcripts, with and without redaction (20+ minutes)
+uv run python -m senjin.eval.fairness --bases strong --judge qwen3:8b-16k
+```
+
+The live check prints each score and a technical-score spread per group. With redaction on, the spread must be 0.
+
+Containers (tests, assessment and the MCP server only; Ollama, audio and the Meet bot stay native on macOS):
+
+```bash
+docker build -t senjin:dev .
+docker run --rm senjin:dev                                           # runs the test suite
+docker run --rm -v "$PWD/data:/app/data" senjin:dev senjin-assess data/sessions/<file>.jsonl
+```
+
+Inside Docker, Ollama is reached at `http://host.docker.internal:11434` (set `OLLAMA_HOST` to change it).
+
+Not included: uploading reports to Drive or Slack. Reports stay local until a person shares them.
 
 ## Git and release
 

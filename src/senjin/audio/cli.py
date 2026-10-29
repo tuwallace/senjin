@@ -84,7 +84,7 @@ async def run(args) -> None:
             stt,
             tts,
             player,
-            VoiceConfig(barge_in=not args.no_barge_in),
+            VoiceConfig(barge_in=not args.no_barge_in, idle_prompt_s=args.idle_seconds or None),
             TurnConfig(end_silence_ms=args.silence_ms),
             latency_path=out.with_suffix(".latency.jsonl"),
             on_text=lambda who, text: print(
@@ -196,6 +196,10 @@ def main() -> None:
         "--no-barge-in", action="store_true", help="use with speakers, not headphones"
     )
     run_p.add_argument("--silence-ms", type=int, default=800, help="silence that ends your turn")
+    run_p.add_argument("--max-minutes", type=float, default=45, help="time box for the interview")
+    run_p.add_argument(
+        "--idle-seconds", type=float, default=25, help="silence before a nudge (0 = off)"
+    )
     run_p.add_argument("--out", type=Path)
     sim_p = sub.choices["simulate"]
     sim_p.add_argument("--model", default=DEFAULT_MODEL)

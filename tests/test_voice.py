@@ -216,3 +216,88 @@ async def test_stt_noise_is_ignored():
         loop.run(frames(script, ref, lambda: loop.stt.called and not loop.busy)), 10
     )
     assert [m["role"] for m in session.history] == ["assistant"]  # empty transcript, no turn
+
+
+async def test_silence_watchdog_prompts_then_ends_politely():
+    loop, session, player = make_loop(
+        ["Hello and welcome, are you ready?"],
+        [],
+        clip_s=0.01,
+        config=VoiceConfig(idle_prompt_s=0.15, max_idle_prompts=2),
+    )
+    ref: dict = {}
+    await asyncio.wait_for(
+        loop.run(frames("", ref, lambda: session.finished and not loop.busy)), 10
+    )
+    said = [m["content"] for m in session.history if m["role"] == "assistant"]
+    assert said[1] == "Are you still there?"
+    assert "can't hear you" in said[2]
+    assert "end the call here" in said[3]
+    assert session.finished
+
+
+async def test_candidate_speech_resets_the_idle_clock():
+    loop, session, _ = make_loop(
+        ["Welcome, are you ready?", "Great, tell me about yourself."],
+        ["I am ready"],
+        clip_s=0.01,
+        config=VoiceConfig(idle_prompt_s=0.6),
+    )
+    ref: dict = {}
+    script = "." * 20 + "s" * 20  # speaks well inside the idle window
+    await asyncio.wait_for(
+        loop.run(frames(script, ref, lambda: len(loop.records) >= 2 and not loop.busy)), 10
+    )
+    said = [m["content"] for m in session.history if m["role"] == "assistant"]
+    assert "Are you still there?" not in said
+
+
+async def test_failed_reply_gets_an_apology_then_recovers():
+    class Flaky(FakeLLM):
+        async def stream(self, messages, tools=None):
+            if len(self.calls) == 1:  # the reply to the first candidate answer
+                self.calls.append(messages)
+                raise RuntimeError("ollama down")
+            async for e in super().stream(messages, tools):
+                yield e
+
+    session = InterviewSession(Flaky(["Hi, are you ready to begin?", "unused"]))
+    player = FakePlayer(0.01)
+    loop = VoiceLoop(
+        session, fake_vad, FakeSTT(["I am ready"]), FakeTTS(), player,
+        VoiceConfig(idle_prompt_s=None),
+    )  # fmt: skip
+    ref: dict = {}
+    script = "." * 40 + "s" * 20
+
+    def apologized() -> bool:
+        said = [m["content"] for m in session.history if m["role"] == "assistant"]
+        return any(t.startswith("Sorry") for t in said) and not loop.busy
+
+    await asyncio.wait_for(loop.run(frames(script, ref, apologized)), 10)
+    assert len(loop.errors) == 1
+    assert any(m["content"].startswith("Sorry, I had a technical problem") for m in session.history)
+
+
+async def test_repeated_errors_end_the_call():
+    class Broken(FakeLLM):
+        async def stream(self, messages, tools=None):
+            if self.calls:
+                raise RuntimeError("down")
+            async for e in super().stream(messages, tools):
+                yield e
+            self.calls.append(messages)
+
+    session = InterviewSession(Broken(["Hi, are you ready to begin?"]))
+    loop = VoiceLoop(
+        session, fake_vad, FakeSTT(["a"] * 5), FakeTTS(), FakePlayer(0.01),
+        VoiceConfig(idle_prompt_s=None, max_consecutive_errors=2),
+    )  # fmt: skip
+    ref: dict = {}
+    script = ("." * 40 + "s" * 20) * 3
+    await asyncio.wait_for(
+        loop.run(frames(script, ref, lambda: session.finished and not loop.busy)), 15
+    )
+    assert session.finished
+    said = [m["content"] for m in session.history if m["role"] == "assistant"]
+    assert "technical difficulties" in said[-1]

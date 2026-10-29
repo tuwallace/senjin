@@ -117,3 +117,71 @@ async def test_microphone_and_speaker_are_pinned_by_label(server):
         assert result["ids"]["spk"] and result["sink"] == result["ids"]["spk"]
     finally:
         await bot.close()
+
+
+from senjin.meet.supervisor import watch_call  # noqa: E402
+
+
+class ScriptedBot:
+    def __init__(self, fail_rejoin=False):
+        self.joins = 0
+        self.fail_rejoin = fail_rejoin
+
+    async def wait_until_ended(self):
+        return
+
+    async def join(self, url, admit_timeout, log):
+        self.joins += 1
+        if self.fail_rejoin:
+            raise RuntimeError("denied")
+
+
+async def test_watch_call_returns_finished_without_rejoining():
+    bot = ScriptedBot()
+    assert await watch_call(bot, "u", lambda: True, log=lambda *_: None) == "finished"
+    assert bot.joins == 0
+
+
+async def test_watch_call_rejoins_then_gives_up():
+    bot = ScriptedBot()
+    assert await watch_call(bot, "u", lambda: False, max_rejoins=2, log=lambda *_: None) == "ended"
+    assert bot.joins == 2
+
+
+async def test_watch_call_stops_when_rejoin_fails():
+    bot = ScriptedBot(fail_rejoin=True)
+    assert await watch_call(bot, "u", lambda: False, log=lambda *_: None) == "ended"
+    assert bot.joins == 1
+
+
+@needs_chrome
+async def test_real_bot_rejoins_a_dropping_call(server):
+    bot = make_bot()
+    await bot.start()
+    joins = 0
+    original = bot.join
+
+    async def counting_join(*a, **kw):
+        nonlocal joins
+        joins += 1
+        return await original(*a, **kw)
+
+    bot.join = counting_join
+    wait = bot.wait_until_ended
+
+    async def quick_wait():
+        await wait(poll=0.1, misses=2)
+
+    bot.wait_until_ended = quick_wait
+    try:
+        url = f"{server}/mock_meet.html?drop=1"
+        await bot.join(url, admit_timeout=10, log=lambda *_: None)
+        result = await asyncio.wait_for(
+            watch_call(
+                bot, url, lambda: False, max_rejoins=2, rejoin_timeout=10, log=lambda *_: None
+            ),
+            60,
+        )
+        assert result == "ended" and joins == 3  # first join + two rejoins
+    finally:
+        await bot.close()

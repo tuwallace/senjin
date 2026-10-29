@@ -29,6 +29,7 @@ document.getElementById("join").onclick = () => {
     if (q.get("deny")) { document.getElementById("denied").hidden = false; return; }
     document.getElementById("call").hidden = false;
     setTimeout(() => { document.getElementById("count").textContent = "2"; }, 300);
+    if (q.get("drop")) setTimeout(() => { document.getElementById("call").hidden = true; }, 800);
   }, 300);
 };
 document.getElementById("leave").onclick = () => {

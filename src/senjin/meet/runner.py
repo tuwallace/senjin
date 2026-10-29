@@ -14,11 +14,13 @@ from senjin.audio.tts import PiperTTS
 from senjin.audio.vad import SileroVAD, TurnConfig
 from senjin.interview.exemplars import ExemplarIndex
 from senjin.interview.session import InterviewSession
+from senjin.interview.state import InterviewState
 from senjin.interview.transcript import TranscriptLog
 from senjin.llm.client import OllamaClient
 from senjin.llm.tools import FilteredTools, open_mcp_tools
 from senjin.meet.audio import find_bridge
 from senjin.meet.joiner import MeetBot
+from senjin.meet.supervisor import watch_call
 
 LABEL = {"interviewer": "Sen", "candidate": "Candidate"}
 
@@ -34,6 +36,8 @@ async def run_meet_interview(
     admit_timeout: float = 300.0,
     wait_candidate: float = 600.0,
     silence_ms: int = 800,
+    max_minutes: float = 45,
+    idle_seconds: float = 25,
     guest_name: str = "Sen (AI interviewer)",
     exemplars: Path | None = None,
     log=print,
@@ -66,15 +70,17 @@ async def run_meet_interview(
                 tools=tools,
                 exemplars=ExemplarIndex.load(exemplars) if exemplars else None,
                 prefetch=True,
+                state=InterviewState(max_total_seconds=max_minutes * 60),
             )
             loop = VoiceLoop(
                 session, SileroVAD(SILERO_PATH), stt, tts, player,
-                VoiceConfig(), TurnConfig(end_silence_ms=silence_ms),
+                VoiceConfig(idle_prompt_s=idle_seconds or None),
+                TurnConfig(end_silence_ms=silence_ms),
                 latency_path=out.with_suffix(".latency.jsonl"),
                 on_text=lambda who, text: log(f"{LABEL[who]}: {text}"),
             )  # fmt: skip
             run = asyncio.create_task(loop.run(mic_frames(bridge.hear_index, channels=2)))
-            ended = asyncio.create_task(bot.wait_until_ended())
+            ended = asyncio.create_task(watch_call(bot, url, lambda: session.finished, log=log))
             done, pending = await asyncio.wait({run, ended}, return_when=asyncio.FIRST_COMPLETED)
             for task in pending:
                 task.cancel()

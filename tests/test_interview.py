@@ -169,3 +169,31 @@ async def test_prefetch_off_by_default():
     await collect(session.open())
     await collect(session.respond("ready"))
     assert tools.calls == []
+
+
+async def test_time_box_skips_ahead_then_signs_off():
+    clock = Clock()
+    state = InterviewState(
+        budgets={p: Budget(max_turns=99, max_seconds=1e9) for p in Phase}, max_total_seconds=100
+    )
+    session = InterviewSession(FakeLLM([]), state=state, clock=clock)
+    await collect(session.open())
+    await collect(session.respond("hi"))
+    assert session.state.phase == Phase.INTRO  # plenty of time, budgets not exhausted
+    clock.t = 90  # 90% used
+    await collect(session.respond("answer"))
+    assert session.state.phase == Phase.CANDIDATE_QA
+    await collect(session.respond("my question"))
+    assert session.state.phase == Phase.CANDIDATE_QA  # already past the skip-ahead point
+    clock.t = 101
+    await collect(session.respond("another"))
+    assert session.state.phase == Phase.SIGNOFF and session.finished
+
+
+async def test_say_records_canned_line_and_can_finish():
+    session = InterviewSession(FakeLLM([]))
+    session.say("Are you still there?")
+    assert session.history[-1] == {"role": "assistant", "content": "Are you still there?"}
+    assert not session.finished
+    session.say("Goodbye.", final=True)
+    assert session.finished
