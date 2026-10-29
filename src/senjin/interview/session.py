@@ -167,6 +167,7 @@ class InterviewSession:
         system = {"role": "system", "content": content}
         tools = self.tools.tools if self.tools and not self.prefetch else None
         parts: list[str] = []
+        completed = False
         try:
             for round_ in range(MAX_TOOL_ROUNDS + 1):
                 messages: list[Message] = [system, *self.history]
@@ -187,13 +188,15 @@ class InterviewSession:
                 await self._run_tools(calls)
                 # last round: no tools, so the model must speak
                 tools = self.tools.tools if round_ < MAX_TOOL_ROUNDS - 1 else None
+            completed = True
         finally:
             # Also runs when the reply is cancelled (barge-in): keep what was generated.
             text = "".join(parts).strip()
             if text:
                 self._record("assistant", text)
             self.state.record_interviewer_turn()
-            if self.state.phase.value == "signoff":
+            # A goodbye that was cut off must not end the interview as if it had been said.
+            if self.state.phase == Phase.SIGNOFF and completed:
                 self.state.finished = True
 
     def interrupt(self, spoken: str) -> None:

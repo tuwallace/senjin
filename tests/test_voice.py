@@ -301,3 +301,20 @@ async def test_repeated_errors_end_the_call():
     assert session.finished
     said = [m["content"] for m in session.history if m["role"] == "assistant"]
     assert "technical difficulties" in said[-1]
+
+
+async def test_talking_over_the_goodbye_does_not_cut_it_off():
+    from senjin.interview.state import InterviewState, Phase
+
+    llm = FakeLLM(["Thank you so much for your time today. The team will follow up soon. Goodbye."])
+    session = InterviewSession(llm, state=InterviewState(phase=Phase.SIGNOFF))
+    player = FakePlayer(0.2)
+    loop = VoiceLoop(session, fake_vad, FakeSTT(["thanks bye"]), FakeTTS(), player)
+    ref: dict = {}
+    script = "." * 20 + "s" * 25  # the candidate speaks over the goodbye
+    await asyncio.wait_for(
+        loop.run(frames(script, ref, lambda: session.finished and not loop.busy)), 10
+    )
+    assert loop.interruptions == 0  # (the final stop() on exit is not an interruption)
+    assert session.history[0]["content"].endswith("Goodbye.")
+    assert session.finished

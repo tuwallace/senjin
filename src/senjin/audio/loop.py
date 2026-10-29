@@ -20,6 +20,7 @@ from senjin.audio.stt import STT
 from senjin.audio.tts import TTS, SentenceSplitter
 from senjin.audio.vad import TurnConfig, TurnDetector
 from senjin.interview.session import InterviewSession
+from senjin.interview.state import Phase
 
 IDLE_PROMPTS = ["Are you still there?", "I still can't hear you. Are you able to continue?"]
 GOODBYE_IDLE = (
@@ -101,6 +102,7 @@ class VoiceLoop:
                 events = self.detector.feed(frame, prob)
                 if (
                     self.busy
+                    and not self._saying_goodbye
                     and self.detector.in_speech
                     and self.detector.speech_ms >= self.config.barge_in_ms
                 ):
@@ -164,7 +166,14 @@ class VoiceLoop:
         await self._cancel_turn()
         self.session.interrupt(" ".join(started))
 
+    @property
+    def _saying_goodbye(self) -> bool:
+        """Talking over the sign-off must not cut it short; the goodbye is brief."""
+        return self.session.state.phase == Phase.SIGNOFF
+
     async def _on_utterance(self, audio: np.ndarray) -> None:
+        if self.busy and self._saying_goodbye:
+            return
         if self.busy:  # speech ended before barge-in fired; treat it as a barge-in now
             await self._interrupt()
         self._idle_prompts = 0

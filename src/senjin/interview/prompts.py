@@ -93,8 +93,10 @@ NOTES = {
         "about the role, team or process. Ask nothing else."
     ),
     "qa_answer": (
-        "Answer their question in one to three sentences from the job description. Then ask "
-        "whether they have any other questions."
+        "Answer their question in one to three sentences, using only facts written in the job "
+        "description. For anything not written there (salary, timelines, benefits, team size, "
+        "process dates), say you do not have that information and the team will follow up; "
+        "never invent or promise anything. Then ask whether they have any other questions."
     ),
     "signoff": (
         "Thank the candidate, say the team will review the conversation and follow up, and say "

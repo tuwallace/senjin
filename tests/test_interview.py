@@ -243,3 +243,21 @@ async def test_orchestration_is_off_by_default():
     await collect(session.respond("ready"))
     assert tools.calls == []
     assert llm.tools_seen[-1] == tools.tools  # model-driven mode still offers tools
+
+
+async def test_cut_off_goodbye_does_not_finish_the_interview():
+    state = InterviewState(budgets=one_turn_budgets(), phase=Phase.SIGNOFF)
+    session = InterviewSession(FakeLLM(["Thank you for your time today and goodbye."]), state=state)
+    stream = session.respond("thanks")
+    assert (await stream.__anext__()).strip()  # the goodbye begins...
+    await stream.aclose()  # ...and is cancelled before it ends
+    assert not session.finished
+    complete = InterviewSession(FakeLLM(["Goodbye."]), state=InterviewState(phase=Phase.SIGNOFF))
+    await collect(complete.open())
+    assert complete.finished
+
+
+async def test_qa_note_forbids_inventing_facts():
+    from senjin.interview.prompts import NOTES
+
+    assert "never invent" in NOTES["qa_answer"] and "salary" in NOTES["qa_answer"]
