@@ -1,0 +1,12 @@
+{"ts": 0, "role": "assistant", "phase": "intro", "text": "Hi, I'm Sen, an AI interviewer. This call is transcribed. Ready to begin?"}
+{"ts": 1, "role": "user", "phase": "intro", "text": "Yes, ready."}
+{"ts": 2, "role": "assistant", "phase": "resume_dive", "text": "Tell me about a project you led and your role in it."}
+{"ts": 3, "role": "user", "phase": "resume_dive", "text": "I led the rebuild of our payments ledger to double-entry event sourcing. I designed the migration with dual writes and a reconciliation job, then cut over service by service. We handled four million transactions a day and I mentored four engineers through it."}
+{"ts": 4, "role": "tool", "phase": "", "text": "get_next_technical_question({'topic': 'system_design'}) -> {\"id\": \"be-rate-limiter\", \"topic\": \"system_design\", \"difficulty\": \"medium\", \"prompt\": \"Design a rate limiter\"}"}
+{"ts": 4, "role": "assistant", "phase": "technical", "text": "How would you design a rate limiter for a public API that serves many customers? Walk me through your approach."}
+{"ts": 5, "role": "user", "phase": "technical", "text": "I would use a token bucket per customer key, because it allows short bursts while enforcing a steady average rate. Each request takes a token. I would store the bucket state in Redis and update it atomically with a Lua script so there are no race conditions. I would return 429 with a Retry-After header, and give each customer tier its own limits."}
+{"ts": 6, "role": "assistant", "phase": "technical", "text": "How would this work across multiple servers?"}
+{"ts": 7, "role": "user", "phase": "technical", "text": "Across servers the shared Redis becomes the source of truth, sharded by customer key with consistent hashing. To cut latency I would let each node keep a small local allowance and sync in batches, accepting slight overshoot in exchange for fewer round trips."}
+{"ts": 8, "role": "assistant", "phase": "technical", "text": "What happens when your shared store is unavailable?"}
+{"ts": 9, "role": "user", "phase": "technical", "text": "If Redis is down I would fail open for most customers so an outage does not become an API outage, with a coarse local limiter as a safety net so abusive traffic is still capped. For sensitive endpoints like login I would fail closed. I would alert on the fallback path and test it with fault injection."}
+{"ts": 10, "role": "assistant", "phase": "signoff", "text": "Thank you. The team will review this and follow up. Goodbye."}

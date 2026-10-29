@@ -1,0 +1,12 @@
+{"ts": 0, "role": "assistant", "phase": "intro", "text": "Hi, I'm Sen, an AI interviewer. This call is transcribed. Ready to begin?"}
+{"ts": 1, "role": "user", "phase": "intro", "text": "Yes, ready."}
+{"ts": 2, "role": "assistant", "phase": "resume_dive", "text": "Tell me about a project you led and your role in it."}
+{"ts": 3, "role": "user", "phase": "resume_dive", "text": "I mostly did tickets that my manager gave me. I don't really remember the details of the projects."}
+{"ts": 4, "role": "tool", "phase": "", "text": "get_next_technical_question({'topic': 'system_design'}) -> {\"id\": \"be-rate-limiter\", \"topic\": \"system_design\", \"difficulty\": \"medium\", \"prompt\": \"Design a rate limiter\"}"}
+{"ts": 4, "role": "assistant", "phase": "technical", "text": "How would you design a rate limiter for a public API that serves many customers? Walk me through your approach."}
+{"ts": 5, "role": "user", "phase": "technical", "text": "A rate limiter is something that limits things. I would probably add a sleep in the code so requests are slower."}
+{"ts": 6, "role": "assistant", "phase": "technical", "text": "How would this work across multiple servers?"}
+{"ts": 7, "role": "user", "phase": "technical", "text": "I am not sure how multiple servers would work. Maybe you copy the code to each server."}
+{"ts": 8, "role": "assistant", "phase": "technical", "text": "What happens when your shared store is unavailable?"}
+{"ts": 9, "role": "user", "phase": "technical", "text": "I don't know. I have not worked with that before."}
+{"ts": 10, "role": "assistant", "phase": "signoff", "text": "Thank you. The team will review this and follow up. Goodbye."}

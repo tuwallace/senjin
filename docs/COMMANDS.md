@@ -8,7 +8,7 @@ Phases marked **planned** have no code yet; their commands are the intended ones
 | 0 Repo and tooling | done | v0.0 (initial scaffold) |
 | 1 Text interviewer | done | `v0.1` |
 | 2 MCP context | done | `v0.2` |
-| 3 Assessment | planned | `v0.3` |
+| 3 Assessment | done | `v0.3` |
 | 4 Anthropic dataset | planned | `v0.4` |
 | 5 Voice loop | planned | `v0.5` |
 | 6 Google Meet bot | planned | `v0.6` |
@@ -107,12 +107,41 @@ uv run python -m senjin.eval.bakeoff qwen3:8b-16k llama3.1:8b-instruct-q8_0
 
 Results are recorded in [adr/0001-model-choice.md](adr/0001-model-choice.md).
 
-## Phase 3: Post-interview assessment (planned)
+## Phase 3: Post-interview assessment
+
+Score a saved transcript with the local judge (`qwen2.5:32b-instruct-q4_K_M`, about 19 GB; the first call loads it and takes a while):
 
 ```bash
-uv run senjin-assess data/sessions/<file>.jsonl --judge qwen2.5:32b-instruct-q4_K_M   # writes data/reports/<file>.json and .md
-uv run pytest tests/test_assess.py
+uv run senjin-assess data/sessions/<file>.jsonl
 ```
+
+Outputs `data/reports/<file>.json` (full report with verification stats) and `data/reports/<file>.md` (readable scorecard).
+
+Options:
+
+```bash
+uv run senjin-assess data/sessions/<file>.jsonl --judge qwen3:8b-16k     # faster, weaker judge
+uv run senjin-assess data/sessions/<file>.jsonl --out-dir /tmp/reports    # choose where reports go
+```
+
+Try it without running an interview, using the synthetic transcripts (`strong`, `mediocre`, `weak`, `evasive`):
+
+```bash
+uv run senjin-assess examples/transcripts/strong.jsonl
+```
+
+Check judge quality (4 transcripts x 3 runs; about 10 minutes with the 32B judge):
+
+```bash
+uv run python -m senjin.eval.assess_eval --runs 3
+uv run python -m senjin.eval.assess_eval --runs 1 --judge qwen3:8b-16k
+```
+
+It prints one line per run, the valid-JSON rate, and PASS or FAIL for the score ordering (strong > mediocre > weak, evasive below mediocre).
+
+How it stays honest: output is schema-constrained, retried once if invalid, and every cited quote is checked against the candidate's actual words. Claims with invented quotes are dropped and confidence is set to low. If nothing verifies, the command fails instead of writing a report.
+
+Unit tests (fake judge, no Ollama): `uv run pytest tests/test_assess.py`
 
 ## Phase 4: Anthropic dataset (planned)
 

@@ -37,3 +37,4 @@ asyncio_default_fixture_loop_scope = "function"
 
 [project.scripts]
 senjin-chat = "senjin.cli:main"
+senjin-assess = "senjin.assess.cli:main"

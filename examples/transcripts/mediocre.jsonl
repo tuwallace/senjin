@@ -1,0 +1,12 @@
+{"ts": 0, "role": "assistant", "phase": "intro", "text": "Hi, I'm Sen, an AI interviewer. This call is transcribed. Ready to begin?"}
+{"ts": 1, "role": "user", "phase": "intro", "text": "Yes, ready."}
+{"ts": 2, "role": "assistant", "phase": "resume_dive", "text": "Tell me about a project you led and your role in it."}
+{"ts": 3, "role": "user", "phase": "resume_dive", "text": "I worked on the payments ledger at my company. I wrote a lot of the Go code and fixed bugs. We moved to a new design and it went okay."}
+{"ts": 4, "role": "tool", "phase": "", "text": "get_next_technical_question({'topic': 'system_design'}) -> {\"id\": \"be-rate-limiter\", \"topic\": \"system_design\", \"difficulty\": \"medium\", \"prompt\": \"Design a rate limiter\"}"}
+{"ts": 4, "role": "assistant", "phase": "technical", "text": "How would you design a rate limiter for a public API that serves many customers? Walk me through your approach."}
+{"ts": 5, "role": "user", "phase": "technical", "text": "I would count the requests each user makes per minute and block them if they go over the limit. I would keep the counts in a database and reset them every minute."}
+{"ts": 6, "role": "assistant", "phase": "technical", "text": "How would this work across multiple servers?"}
+{"ts": 7, "role": "user", "phase": "technical", "text": "With multiple servers they would all use the same database for the counts, so it stays consistent. It might be a bit slow but that should be fine."}
+{"ts": 8, "role": "assistant", "phase": "technical", "text": "What happens when your shared store is unavailable?"}
+{"ts": 9, "role": "user", "phase": "technical", "text": "If the database is down, I guess we would just let the requests through for a while until it comes back. I have not thought much about it beyond that."}
+{"ts": 10, "role": "assistant", "phase": "signoff", "text": "Thank you. The team will review this and follow up. Goodbye."}
