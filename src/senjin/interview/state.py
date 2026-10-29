@@ -29,9 +29,16 @@ DEFAULT_BUDGETS: dict[Phase, Budget] = {
 ORDER = list(Phase)
 
 
+def _env_budgets() -> dict[Phase, Budget]:
+    """Default budgets honour SENJIN_MAX_QUESTIONS and friends (imported late: config uses us)."""
+    from senjin.config import InterviewConfig
+
+    return InterviewConfig.from_env().budgets()
+
+
 @dataclass
 class InterviewState:
-    budgets: dict[Phase, Budget] = field(default_factory=lambda: dict(DEFAULT_BUDGETS))
+    budgets: dict[Phase, Budget] = field(default_factory=lambda: _env_budgets())
     phase: Phase = Phase.INTRO
     turns_in_phase: int = 0
     phase_started_at: float = 0.0

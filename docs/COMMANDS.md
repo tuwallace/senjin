@@ -24,6 +24,26 @@ uv sync                 # creates .venv with Python 3.12 and installs dependenci
 
 Check Ollama is up: `curl -s http://localhost:11434/api/tags | head -c 200`
 
+## Interview limits (environment variables)
+
+By default Senjin asks 5 interview questions: 2 about the candidate's background and 3 technical (a question plus its follow-ups counts as turns). The greeting, the candidate's own Q&A and the goodbye are not counted. This keeps local model use small. Change the limits with environment variables:
+
+| Variable | Default | Meaning |
+| :-- | :-- | :-- |
+| `SENJIN_MAX_QUESTIONS` | 5 | questions asked, background plus technical (2 to 30) |
+| `SENJIN_RESUME_QUESTIONS` | 40% of the above, at least 1 | how many of those are about the resume |
+| `SENJIN_QA_TURNS` | 3 | replies reserved for the candidate's questions (1 to 10) |
+| `SENJIN_MAX_MINUTES` | 45 | time box for the whole interview |
+| `SENJIN_IDLE_SECONDS` | 25 | silence before "Are you still there?" (0 = off) |
+
+```bash
+export SENJIN_MAX_QUESTIONS=8            # for this terminal session
+SENJIN_MAX_QUESTIONS=3 uv run senjin-voice run      # for one command
+uv run senjin-meet run URL --max-questions 4        # a flag beats the variable
+```
+
+Bad values stop the program with a message naming the variable. Every `chat`, `voice run` and `meet run` prints the plan when it starts, for example `Interview plan: 5 questions (2 background + 3 technical)...`. Settings live in `src/senjin/config.py`.
+
 ## Phase 0: Repo and tooling
 
 ```bash

@@ -12,6 +12,7 @@ from senjin.audio.loop import VoiceConfig, VoiceLoop, summarize
 from senjin.audio.models import SILERO_PATH, ensure_models
 from senjin.audio.stt import DEFAULT_WHISPER_MODEL, WhisperServerSTT
 from senjin.audio.vad import SileroVAD, TurnConfig
+from senjin.config import InterviewConfig, exit_on_config_error
 from senjin.interview.exemplars import ExemplarIndex
 from senjin.interview.session import InterviewSession
 from senjin.interview.transcript import TranscriptLog
@@ -20,6 +21,15 @@ from senjin.llm.tools import FilteredTools, open_mcp_tools
 
 # record_note costs a full LLM round trip before the interviewer can speak; skip it live.
 VOICE_HIDDEN = {"record_note"}
+
+
+def voice_config(args) -> InterviewConfig:
+    """Environment limits (SENJIN_*), overridden by any flags that were given."""
+    return InterviewConfig.from_env().override(
+        getattr(args, "max_questions", None),
+        getattr(args, "max_minutes", None),
+        getattr(args, "idle_seconds", None),
+    )
 
 
 def make_tts(kind: str):
@@ -55,6 +65,7 @@ async def check(args) -> None:
 
 
 async def run(args) -> None:
+    cfg = voice_config(args)  # validate SENJIN_* before opening devices or servers
     import numpy as np  # noqa: F401  (fail early if audio deps are missing)
 
     from senjin.audio.devices import Player, mic_frames
@@ -73,9 +84,11 @@ async def run(args) -> None:
         tools = FilteredTools(
             await stack.enter_async_context(open_mcp_tools(env=env)), VOICE_HIDDEN
         )
+        print(cfg.describe())
         session = InterviewSession(
             OllamaClient(model=args.model),
             TranscriptLog(out),
+            state=cfg.state(),
             tools=tools,
             prefetch=True,
             exemplars=ExemplarIndex.load(args.exemplars) if args.exemplars else None,
@@ -86,7 +99,7 @@ async def run(args) -> None:
             stt,
             tts,
             player,
-            VoiceConfig(barge_in=not args.no_barge_in, idle_prompt_s=args.idle_seconds or None),
+            VoiceConfig(barge_in=not args.no_barge_in, idle_prompt_s=cfg.idle_seconds or None),
             TurnConfig(end_silence_ms=args.silence_ms),
             latency_path=out.with_suffix(".latency.jsonl"),
             on_text=lambda who, text: print(
@@ -126,6 +139,7 @@ def to_16k(pcm, rate):
 
 
 async def simulate(args) -> None:
+    cfg = voice_config(args)
     """Full pipeline with synthetic candidate speech instead of a microphone."""
     import numpy as np
 
@@ -140,8 +154,13 @@ async def simulate(args) -> None:
     clips = [to_16k(await tts.synth(t), tts.sample_rate) for t in SIM_ANSWERS[: args.turns]]
     async with AsyncExitStack() as stack:
         tools = FilteredTools(await stack.enter_async_context(open_mcp_tools()), VOICE_HIDDEN)
+        print(cfg.describe())
         session = InterviewSession(
-            OllamaClient(model=args.model), TranscriptLog(out), tools=tools, prefetch=True
+            OllamaClient(model=args.model),
+            TranscriptLog(out),
+            state=cfg.state(),
+            tools=tools,
+            prefetch=True,
         )
         loop = VoiceLoop(
             session, SileroVAD(SILERO_PATH), stt, tts, SilentPlayer(tts.sample_rate),
@@ -182,6 +201,7 @@ def report(path: Path) -> None:
     print(summarize(rows))
 
 
+@exit_on_config_error
 def main() -> None:
     parser = argparse.ArgumentParser(prog="senjin-voice")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -201,9 +221,16 @@ def main() -> None:
         "--no-barge-in", action="store_true", help="use with speakers, not headphones"
     )
     run_p.add_argument("--silence-ms", type=int, default=800, help="silence that ends your turn")
-    run_p.add_argument("--max-minutes", type=float, default=45, help="time box for the interview")
     run_p.add_argument(
-        "--idle-seconds", type=float, default=25, help="silence before a nudge (0 = off)"
+        "--max-questions", type=int, help="questions to ask (env SENJIN_MAX_QUESTIONS, default 5)"
+    )
+    run_p.add_argument(
+        "--max-minutes", type=float, help="time box (env SENJIN_MAX_MINUTES, default 45)"
+    )
+    run_p.add_argument(
+        "--idle-seconds",
+        type=float,
+        help="silence before a nudge (env SENJIN_IDLE_SECONDS, default 25)",
     )
     run_p.add_argument("--out", type=Path)
     sim_p = sub.choices["simulate"]

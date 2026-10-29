@@ -5,6 +5,7 @@ import asyncio
 from pathlib import Path
 
 from senjin.audio.stt import DEFAULT_WHISPER_MODEL
+from senjin.config import InterviewConfig, exit_on_config_error
 from senjin.llm.client import DEFAULT_MODEL
 from senjin.meet.accounts import ProfileError, keep_account, logout
 from senjin.meet.audio import HEAR_DEVICE, SPEAK_DEVICE, DeviceError, find_bridge
@@ -31,6 +32,7 @@ async def login() -> None:
     )
 
 
+@exit_on_config_error
 def main() -> None:
     parser = argparse.ArgumentParser(prog="senjin-meet")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -62,10 +64,9 @@ def main() -> None:
     run.add_argument("--admit-timeout", type=float, default=300)
     run.add_argument("--wait-candidate", type=float, default=600)
     run.add_argument("--silence-ms", type=int, default=800)
-    run.add_argument("--max-minutes", type=float, default=45, help="time box for the interview")
-    run.add_argument(
-        "--idle-seconds", type=float, default=25, help="silence before a nudge (0 = off)"
-    )
+    run.add_argument("--max-questions", type=int, help="env SENJIN_MAX_QUESTIONS, default 5")
+    run.add_argument("--max-minutes", type=float, help="env SENJIN_MAX_MINUTES, default 45")
+    run.add_argument("--idle-seconds", type=float, help="env SENJIN_IDLE_SECONDS, default 25")
     run.add_argument(
         "--assess", action="store_true", help="score the transcript when the call ends"
     )
@@ -109,7 +110,9 @@ def main() -> None:
                     speak=args.speak_device, hear=args.hear_device, out=out,
                     admit_timeout=args.admit_timeout, wait_candidate=args.wait_candidate,
                     silence_ms=args.silence_ms, guest_name=args.guest_name,
-                    max_minutes=args.max_minutes, idle_seconds=args.idle_seconds,
+                    config=InterviewConfig.from_env().override(
+                        args.max_questions, args.max_minutes, args.idle_seconds
+                    ),
                     exemplars=args.exemplars, candidate_dir=args.candidate_dir,
                 )
             )  # fmt: skip

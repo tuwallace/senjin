@@ -12,9 +12,9 @@ from senjin.audio.models import SILERO_PATH, ensure_models
 from senjin.audio.stt import WhisperServerSTT
 from senjin.audio.tts import PiperTTS
 from senjin.audio.vad import SileroVAD, TurnConfig
+from senjin.config import InterviewConfig
 from senjin.interview.exemplars import ExemplarIndex
 from senjin.interview.session import InterviewSession
-from senjin.interview.state import InterviewState
 from senjin.interview.transcript import TranscriptLog
 from senjin.llm.client import OllamaClient
 from senjin.llm.tools import FilteredTools, open_mcp_tools
@@ -36,13 +36,14 @@ async def run_meet_interview(
     admit_timeout: float = 300.0,
     wait_candidate: float = 600.0,
     silence_ms: int = 800,
-    max_minutes: float = 45,
-    idle_seconds: float = 25,
+    config: InterviewConfig | None = None,
     guest_name: str = "Sen (AI interviewer)",
     exemplars: Path | None = None,
     candidate_dir: Path | None = None,
     log=print,
 ) -> Path:
+    cfg = config or InterviewConfig.from_env()
+    log(cfg.describe())
     bridge = find_bridge(speak=speak, hear=hear)  # fail fast, before opening a browser
     ensure_models()
     tts = PiperTTS()
@@ -73,11 +74,11 @@ async def run_meet_interview(
                 tools=tools,
                 exemplars=ExemplarIndex.load(exemplars) if exemplars else None,
                 prefetch=True,
-                state=InterviewState(max_total_seconds=max_minutes * 60),
+                state=cfg.state(),
             )
             loop = VoiceLoop(
                 session, SileroVAD(SILERO_PATH), stt, tts, player,
-                VoiceConfig(idle_prompt_s=idle_seconds or None),
+                VoiceConfig(idle_prompt_s=cfg.idle_seconds or None),
                 TurnConfig(end_silence_ms=silence_ms),
                 latency_path=out.with_suffix(".latency.jsonl"),
                 on_text=lambda who, text: log(f"{LABEL[who]}: {text}"),
