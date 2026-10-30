@@ -12,6 +12,7 @@ from senjin.audio.models import SILERO_PATH, ensure_models
 from senjin.audio.stt import WhisperServerSTT
 from senjin.audio.tts import PiperTTS
 from senjin.audio.vad import SileroVAD, TurnConfig
+from senjin.audio.vocab import vocabulary_hint
 from senjin.config import InterviewConfig
 from senjin.interview.exemplars import ExemplarIndex
 from senjin.interview.session import InterviewSession
@@ -22,7 +23,7 @@ from senjin.meet.audio import find_bridge
 from senjin.meet.joiner import MeetBot
 from senjin.meet.supervisor import watch_call
 
-LABEL = {"interviewer": "Sen", "candidate": "Candidate"}
+LABEL = {"interviewer": "Senjin", "candidate": "Candidate"}
 
 
 async def run_meet_interview(
@@ -36,7 +37,7 @@ async def run_meet_interview(
     admit_timeout: float = 300.0,
     wait_candidate: float = 600.0,
     config: InterviewConfig | None = None,
-    guest_name: str = "Sen (AI interviewer)",
+    guest_name: str = "Senjin (AI interviewer)",
     exemplars: Path | None = None,
     candidate_dir: Path | None = None,
     log=print,
@@ -53,14 +54,8 @@ async def run_meet_interview(
     player = Player(tts.sample_rate, device=bridge.speak_index, channels=2)
     async with AsyncExitStack() as stack:
         try:
-            await bot.start()
-            if not await bot.signed_in():
-                log("Not signed in to Google: joining as a guest (the host must admit the bot).")
-            await bot.join(url, admit_timeout, log)
-            log(f"In the call. Waiting up to {wait_candidate:.0f}s for the candidate to arrive...")
-            if not await bot.wait_for_participants(2, wait_candidate):
-                log("Candidate did not arrive (or participant count unreadable); starting anyway.")
-
+            # Everything slow happens before the bot joins: the model loads and reads the long
+            # prompt now, so the first thing the candidate hears is not delayed.
             env = {**os.environ, "SENJIN_NOTES_PATH": str(out.with_suffix(".notes.jsonl"))}
             if candidate_dir:
                 env["SENJIN_CANDIDATE_DIR"] = str(candidate_dir)
@@ -75,16 +70,27 @@ async def run_meet_interview(
                 prefetch=True,
                 state=cfg.state(),
             )
+            log("Loading the model...")
+            await session.warm()
+            stt.prompt = vocabulary_hint(session.context)
             loop = VoiceLoop(
                 session, SileroVAD(SILERO_PATH), stt, tts, player,
                 VoiceConfig(
                     idle_prompt_s=cfg.idle_seconds or None,
                     filler_delay_ms=cfg.filler_ms or None,
+                    short_answer_hold_ms=cfg.hold_ms,
                 ),
                 TurnConfig(end_silence_ms=cfg.silence_ms),
                 latency_path=out.with_suffix(".latency.jsonl"),
                 on_text=lambda who, text: log(f"{LABEL[who]}: {text}"),
             )  # fmt: skip
+            await bot.start()
+            if not await bot.signed_in():
+                log("Not signed in to Google: joining as a guest (the host must admit the bot).")
+            await bot.join(url, admit_timeout, log)
+            log(f"In the call. Waiting up to {wait_candidate:.0f}s for the candidate to arrive...")
+            if not await bot.wait_for_participants(2, wait_candidate):
+                log("Candidate did not arrive (or participant count unreadable); starting anyway.")
             run = asyncio.create_task(loop.run(mic_frames(bridge.hear_index, channels=2)))
             ended = asyncio.create_task(watch_call(bot, url, lambda: session.finished, log=log))
             done, pending = await asyncio.wait({run, ended}, return_when=asyncio.FIRST_COMPLETED)
@@ -94,6 +100,11 @@ async def run_meet_interview(
             if run in done and run.exception():
                 raise run.exception()
             log("Interview over." if session.finished else "The call ended before the sign-off.")
+            log("Leaving the call..." if await bot.in_call() else "The call has already ended.")
+            if await bot.leave():
+                log("Senjin has left the call.")
+            else:
+                log("Warning: could not confirm that Senjin left the call.")
             log(summarize(loop.records))
             for err in loop.errors:
                 log(f"error: {err!r}")

@@ -51,3 +51,8 @@ async def test_mcp_server_over_stdio():
         assert "Northwind" in await runner.call("get_candidate_resume", {})
         q = json.loads(await runner.call("get_next_technical_question", {"difficulty": "hard"}))
         assert q["difficulty"] == "hard"
+
+
+def test_question_set_limits_the_bank():
+    only = load_questions(ROOT / "question_bank", ["fullstack"])
+    assert only and all(q.id.startswith("fs-") for q in only)

@@ -65,6 +65,8 @@ def main() -> None:
     run.add_argument("--wait-candidate", type=float, default=600)
     run.add_argument("--silence-ms", type=int, help="env SENJIN_SILENCE_MS, default 1000")
     run.add_argument("--filler-ms", type=int, help="env SENJIN_FILLER_MS, default 1100 (0 = off)")
+    run.add_argument("--hold-ms", type=int, help="env SENJIN_HOLD_MS, default 1500 (0 = off)")
+    run.add_argument("--follow-ups", type=int, help="env SENJIN_FOLLOW_UPS, default 1 (0 to 3)")
     run.add_argument("--max-questions", type=int, help="env SENJIN_MAX_QUESTIONS, default 5")
     run.add_argument("--max-minutes", type=float, help="env SENJIN_MAX_MINUTES, default 45")
     run.add_argument("--idle-seconds", type=float, help="env SENJIN_IDLE_SECONDS, default 25")
@@ -72,7 +74,7 @@ def main() -> None:
         "--assess", action="store_true", help="score the transcript when the call ends"
     )
     run.add_argument("--judge", default=None, help="judge model for --assess")
-    run.add_argument("--guest-name", default="Sen (AI interviewer)")
+    run.add_argument("--guest-name", default="Senjin (AI interviewer)")
     args = parser.parse_args()
 
     try:
@@ -117,6 +119,8 @@ def main() -> None:
                         args.idle_seconds,
                         args.silence_ms,
                         args.filler_ms,
+                        args.hold_ms,
+                        args.follow_ups,
                     ),
                     exemplars=args.exemplars, candidate_dir=args.candidate_dir,
                 )

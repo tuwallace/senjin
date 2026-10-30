@@ -8,6 +8,7 @@ from senjin.audio.stt import clean_transcript, to_wav_bytes
 from senjin.audio.tts import SentenceSplitter
 from senjin.audio.vad import FRAME, TurnConfig, TurnDetector
 from senjin.interview.session import InterviewSession
+from senjin.interview.state import InterviewState, Phase
 from senjin.llm.fake import FakeLLM
 
 SPEECH = np.full(FRAME, 0.9, dtype=np.float32)
@@ -411,10 +412,130 @@ async def test_no_filler_on_two_turns_in_a_row():
     session = InterviewSession(llm)
     config = VoiceConfig(idle_prompt_s=None, filler_delay_ms=100)
     loop = VoiceLoop(
-        session, fake_vad, FakeSTT(["first", "second"]), FakeTTS(), FakePlayer(0.03), config
+        session,
+        fake_vad,
+        FakeSTT(["my first answer", "my second answer"]),
+        FakeTTS(),
+        FakePlayer(0.03),
+        config,
     )
     script = "." * 40 + "s" * 20 + "." * 120 + "s" * 20
     until = lambda: len(loop.records) >= 3 and not loop.busy  # noqa: E731
     await asyncio.wait_for(loop.run(frames(script, {}, until)), 20)
     assert "filler" in loop.records[1]
     assert "filler" not in loop.records[2]
+
+
+async def test_unfinished_fragment_is_merged_with_the_rest_of_the_answer(tmp_path):
+    from senjin.interview.transcript import TranscriptLog
+
+    llm = SlowLLM(["Welcome, are you ready?", "Understood. Tell me about a project."], 0.5)
+    session = InterviewSession(llm, TranscriptLog(tmp_path / "s.jsonl"))
+    config = VoiceConfig(idle_prompt_s=None, filler_delay_ms=None)
+    stt = FakeSTT(["I would set a timer", "I would set a timer or push from the server"])
+    loop = VoiceLoop(session, fake_vad, stt, FakeTTS(), FakePlayer(0.03), config)
+    # first part, a pause long enough to end the turn, then the rest while the model is thinking
+    script = "." * 40 + "s" * 20 + "." * 45 + "s" * 20
+    until = lambda: not stt.texts and not loop.busy  # noqa: E731
+    await asyncio.wait_for(loop.run(frames(script, {}, until)), 15)
+    users = [m["content"] for m in session.history if m["role"] == "user"]
+    assert users == ["I would set a timer or push from the server"]
+    rows = TranscriptLog.load(tmp_path / "s.jsonl")
+    assert "retract" in [r["role"] for r in rows]
+
+
+class SlowOpeningLLM(FakeLLM):
+    """The model is still loading when the greeting is requested: its first text comes late."""
+
+    async def stream(self, messages, tools=None):
+        if not self.calls:
+            await asyncio.sleep(0.6)
+        async for event in super().stream(messages, tools):
+            yield event
+
+
+async def test_opening_killed_by_noise_is_said_again():
+    llm = SlowOpeningLLM(["Hello, I am Senjin. Are you ready to begin?"])
+    session = InterviewSession(llm)
+    player = FakePlayer(0.05)
+    config = VoiceConfig(idle_prompt_s=None, filler_delay_ms=None)
+    loop = VoiceLoop(session, fake_vad, FakeSTT([""]), FakeTTS(), player, config)
+    script = "." * 5 + "s" * 25  # a cough while the model is still preparing the greeting
+    until = lambda: bool(session.history) and not loop.busy  # noqa: E731
+    await asyncio.wait_for(loop.run(frames(script, {}, until)), 10)
+    assert loop.interruptions == 1
+    assert [m["role"] for m in session.history] == ["assistant"]
+    assert session.history[0]["content"].startswith("Hello, I am Senjin")
+
+
+async def test_no_filler_after_a_one_word_utterance():
+    loop, session, player = make_slow_loop(0.5, filler_ms=100)
+    loop.stt.texts = ["Hello?"]
+    await run_one_turn(loop, session)
+    assert "filler" not in loop.records[-1]
+
+
+def test_looks_unfinished():
+    from senjin.audio.loop import looks_unfinished
+
+    assert looks_unfinished("I created a data change capture and")
+    assert looks_unfinished("I would use the")
+    assert looks_unfinished("it scales well")  # no closing mark
+    assert not looks_unfinished("I created a data change capture.")
+
+
+def _hold_loop(stt_texts, hold_ms, phase=Phase.TECHNICAL):
+    llm = SlowLLM(["Welcome.", "Understood. Next question?"], 0.2)
+    state = InterviewState(phase=phase)
+    session = InterviewSession(llm, state=state)
+    config = VoiceConfig(idle_prompt_s=None, filler_delay_ms=None, short_answer_hold_ms=hold_ms)
+    loop = VoiceLoop(session, fake_vad, FakeSTT(stt_texts), FakeTTS(), FakePlayer(0.03), config)
+    return loop, session
+
+
+async def test_short_answer_is_held_so_a_pause_does_not_cut_it_off():
+    loop, session = _hold_loop(
+        ["I did it.", "I did it. I built a change data capture pipeline."], 800
+    )
+    # a short answer, a pause that ends the turn, then the candidate carries on during the hold
+    script = "." * 40 + "s" * 20 + "." * 45 + "s" * 20
+    until = lambda: not loop.stt.texts and not loop.busy  # noqa: E731
+    await asyncio.wait_for(loop.run(frames(script, {}, until)), 15)
+    users = [m["content"] for m in session.history if m["role"] == "user"]
+    assert users == ["I did it. I built a change data capture pipeline."]
+    # the held answer never reached the session, so the interviewer's question was not undone
+    assert [m["role"] for m in session.history].count("assistant") == 2
+
+
+async def test_no_hold_during_the_intro_or_when_switched_off():
+    for phase, hold in ((Phase.INTRO, 800), (Phase.TECHNICAL, 0)):
+        loop, session = _hold_loop(["Yes."], hold, phase)
+        script = "." * 40 + "s" * 20
+        until = lambda lp=loop: len(lp.records) >= 2 and not lp.busy  # noqa: E731
+        await asyncio.wait_for(loop.run(frames(script, {}, until)), 15)
+        assert "held_s" not in loop.records[-1]
+
+
+def test_speaker_change_marks_are_dropped_from_transcripts():
+    assert (
+        clean_transcript(">> Well, for page speed it is fine.")
+        == "Well, for page speed it is fine."
+    )
+    assert clean_transcript("- I'm ready.") == "I'm ready."
+
+
+async def test_no_hold_after_a_complete_non_answer():
+    for said in ("I don't know.", "No.", "Not sure."):
+        loop, session = _hold_loop([said], 800)
+        script = "." * 40 + "s" * 20
+        until = lambda lp=loop: len(lp.records) >= 2 and not lp.busy  # noqa: E731
+        await asyncio.wait_for(loop.run(frames(script, {}, until)), 15)
+        assert "held_s" not in loop.records[-1], said
+
+
+async def test_an_unfinished_dont_know_is_still_held():
+    loop, session = _hold_loop(["I don't know how I would keep it fresh and"], 300)
+    script = "." * 40 + "s" * 20
+    until = lambda: len(loop.records) >= 2 and not loop.busy  # noqa: E731
+    await asyncio.wait_for(loop.run(frames(script, {}, until)), 15)
+    assert loop.records[-1].get("held_s", 0) > 0.2

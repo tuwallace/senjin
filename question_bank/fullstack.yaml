@@ -1,0 +1,110 @@
+- id: fs-ssr-ssg-isr
+  topic: web_rendering
+  difficulty: medium
+  prompt: A public government portal has some pages that rarely change and some that show live data. How would you decide between static generation, server rendering and client rendering in Next.js?
+  follow_ups:
+    - How would you keep a statically generated page fresh when its content changes?
+    - What does that choice mean for SEO and for page speed?
+  rubric:
+    - Matches rendering mode to data freshness and per-user content (SSG/ISR, SSR, client fetch)
+    - Knows revalidation, caching and on-demand invalidation in Next.js
+    - Connects the choice to SEO, time to first byte and hosting cost
+- id: fs-app-router
+  topic: web_rendering
+  difficulty: medium
+  prompt: How do React Server Components in the Next.js App Router change where you put data fetching and state compared with the Pages Router?
+  follow_ups:
+    - When does a component need to be a client component?
+    - How do you avoid leaking server-only code or secrets to the browser?
+  rubric:
+    - Explains server versus client components and the boundary between them
+    - Fetches on the server, keeps interactive state on the client
+    - Protects secrets and server-only modules
+- id: fs-auth
+  topic: security
+  difficulty: hard
+  prompt: Design sign-in for a web application where users log in with an identity provider such as Okta or Login.gov. What would the flow look like end to end?
+  follow_ups:
+    - Where would you store the session, and how would you protect it?
+    - How would you add role-based access control for pages and API routes?
+  rubric:
+    - Describes an OAuth 2.0 / OIDC authorization code flow with PKCE, or SAML where relevant
+    - Uses secure httpOnly cookies or server sessions and addresses CSRF and token expiry
+    - Enforces authorization on the server for every route, not only in the UI
+- id: fs-accessibility
+  topic: accessibility
+  difficulty: easy
+  prompt: A public-facing form must meet Section 508 and WCAG 2.1 AA. What do you build in and how do you check it?
+  follow_ups:
+    - How would you test accessibility automatically and by hand?
+    - How do you handle error messages for screen reader users?
+  rubric:
+    - Semantic HTML, labels, keyboard navigation, focus management and contrast
+    - Automated checks (axe, Lighthouse) plus manual screen reader testing
+    - Accessible error and status announcements (aria-live, error association)
+- id: fs-api-design
+  topic: api_design
+  difficulty: medium
+  prompt: You are building the API behind a React front end that lists, filters and edits records. Would you use REST or GraphQL, and how would you design it?
+  follow_ups:
+    - How would you handle pagination and large result sets?
+    - How would you validate input and version the API over time?
+  rubric:
+    - Justifies REST or GraphQL for this use case with trade-offs (over-fetching, caching, complexity)
+    - Cursor or offset pagination with stable ordering
+    - Server-side input validation, consistent errors and a versioning or deprecation plan
+- id: fs-state-management
+  topic: frontend
+  difficulty: medium
+  prompt: A React application's state has grown messy, with data fetched in many places. How would you organize server data and UI state?
+  follow_ups:
+    - When would you reach for Redux or Zustand instead of context?
+    - How do you avoid unnecessary re-renders?
+  rubric:
+    - Separates server state (React Query, SWR, server components) from local UI state
+    - Chooses context, Zustand or Redux for stated reasons
+    - Knows memoization, selectors and component structure to limit renders
+- id: fs-testing
+  topic: testing
+  difficulty: easy
+  prompt: How do you decide what to test in a Next.js application, and with which tools?
+  follow_ups:
+    - What would you cover with end-to-end tests and what with unit tests?
+    - How do you keep end-to-end tests from becoming flaky?
+  rubric:
+    - Test pyramid with Jest or Vitest, React Testing Library and Playwright or Cypress
+    - Tests behavior the user sees rather than implementation details
+    - Stable selectors, controlled test data and waiting on conditions rather than sleeps
+- id: fs-cicd-containers
+  topic: devops
+  difficulty: medium
+  prompt: Walk me through how a change to a Next.js and Node.js application gets from a pull request to production in a regulated environment.
+  follow_ups:
+    - How would you containerize it and keep the image small and safe?
+    - How would you roll back a bad release?
+  rubric:
+    - CI stages: lint, tests, build, dependency and container scanning, approvals
+    - Multi-stage Docker builds, non-root users, pinned base images, secrets outside the image
+    - Safe deployment strategies (blue/green or canary) and a rollback plan
+- id: fs-performance
+  topic: frontend
+  difficulty: medium
+  prompt: Users say a data-heavy page in your application feels slow. How would you find out why and fix it?
+  follow_ups:
+    - Which Core Web Vitals would you look at?
+    - What would you change on the server and what on the client?
+  rubric:
+    - Measures first (Lighthouse, profiler, network panel, real user metrics)
+    - Knows LCP, INP and CLS and their usual causes
+    - Fixes such as caching, code splitting, image optimization, virtualization and query tuning
+- id: fs-leadership
+  topic: engineering_practice
+  difficulty: easy
+  prompt: You are the senior engineer on a team with several mid-level developers. How do you run code reviews and set coding standards?
+  follow_ups:
+    - How do you handle a review disagreement?
+    - How do you grow a developer who keeps making the same mistakes?
+  rubric:
+    - Reviews for correctness, security and clarity; automates style with linters and formatters
+    - Gives specific, kind, actionable feedback and explains the reasons
+    - Mentors through pairing and examples, and resolves disagreements with data or a team decision

@@ -44,7 +44,7 @@ class TurnConfig:
     threshold: float = 0.5
     start_ms: int = 96  # speech needed before an utterance counts as started
     end_silence_ms: int = 800  # silence that ends an utterance (the blueprint suggests 1500)
-    preroll_ms: int = 320  # audio kept from before the start so word onsets are not clipped
+    preroll_ms: int = 500  # audio kept from before the start so word onsets are not clipped
     min_utterance_ms: int = 350  # shorter bursts (coughs, clicks) are discarded
     max_utterance_s: float = 60.0
 

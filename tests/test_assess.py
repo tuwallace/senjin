@@ -120,3 +120,32 @@ async def test_rubrics_are_in_prompt_and_schema_bounds_hold():
     assert "names an algorithm" in judge.prompts[0]
     with pytest.raises(ValueError):
         Assessment.model_validate_json(payload(technical_score=11))
+
+
+async def test_hiring_bar_turns_a_lenient_hire_into_no_hire_and_says_why():
+    judge = FakeJudge(
+        payload(
+            technical_score=6,
+            question_scores=[
+                {
+                    "question_id": "be-rate-limiter",
+                    "score": 3,
+                    "rationale": "Vague.",
+                    "evidence": [{"turn": 5, "quote": "I would use a token bucket"}],
+                }
+            ],
+        )
+    )
+    report = await assess(load_rows(STRONG), judge)
+    assert report.judge_recommendation == "Hire"
+    assert report.assessment.hire_recommendation == "No Hire"
+    assert any("technical 6" in n for n in report.bar_notes)
+    assert any("be-rate-limiter" in n for n in report.bar_notes)
+    md = to_markdown(report)
+    assert "The judge said Hire; changed to No Hire" in md and "**be-rate-limiter**: 3/10" in md
+
+
+async def test_hiring_bar_leaves_a_strong_hire_alone():
+    report = await assess(load_rows(STRONG), FakeJudge(payload(technical_score=8)))
+    assert report.assessment.hire_recommendation == "Hire" and report.bar_notes == []
+    assert "did not change it" in to_markdown(report)

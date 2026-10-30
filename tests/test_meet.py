@@ -70,7 +70,7 @@ async def test_join_flow_against_mock_meet(server):
         await bot.join(f"{server}/mock_meet.html", admit_timeout=10, log=lambda *_: None)
         assert await bot.in_call()
         assert await page.evaluate("window.__clicked") == ["cam", "mic", "join"]
-        assert await page.evaluate("window.__name") == "Sen (AI interviewer)"
+        assert await page.evaluate("window.__name") == "Senjin (AI interviewer)"
         await asyncio.sleep(0.5)
         assert await bot.participant_count() == 2
         assert await bot.wait_for_participants(2, timeout=5)

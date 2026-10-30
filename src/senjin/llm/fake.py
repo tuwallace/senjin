@@ -14,6 +14,10 @@ class FakeLLM:
         self._replies = list(replies)
         self.calls: list[list[Message]] = []
         self.tools_seen: list[list[dict] | None] = []
+        self.warmed: list[list[Message]] = []
+
+    async def warm(self, messages: list[Message]) -> None:
+        self.warmed.append([dict(m) for m in messages])
 
     async def stream(
         self, messages: list[Message], tools: list[dict] | None = None

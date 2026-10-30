@@ -44,6 +44,13 @@ async def run(
         f"{a.hire_recommendation}  tech {a.technical_score}  comm {a.communication_score}  "
         f"confidence {a.confidence}  ({'personal cues redacted' if redact else 'NOT redacted'})"
     )
+    for q in a.question_scores:
+        print(f"  judge score  {q.question_id}: {q.score}/10")
+    if report.bar_notes:
+        print(
+            f"  judge said {report.judge_recommendation}; hiring bar changed it to "
+            f"{a.hire_recommendation}: {'; '.join(report.bar_notes)}"
+        )
     print(f"Wrote {out_dir / (path.stem + '.md')}")
     return out_dir / f"{path.stem}.md"
 

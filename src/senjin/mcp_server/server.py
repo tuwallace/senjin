@@ -1,6 +1,6 @@
 """MCP server exposing interview context. One process per interview (stdio).
 
-Env: SENJIN_CANDIDATE_DIR, SENJIN_QUESTION_BANK, SENJIN_NOTES_PATH.
+Env: SENJIN_CANDIDATE_DIR, SENJIN_QUESTION_BANK, SENJIN_QUESTION_SET, SENJIN_NOTES_PATH.
 Debug with: ollmcp -s src/senjin/mcp_server/server.py -m qwen3:8b-16k
 """
 
@@ -18,6 +18,10 @@ store = InterviewStore(
     candidate_dir=Path(os.environ.get("SENJIN_CANDIDATE_DIR", ROOT / "examples/candidate")),
     bank_dir=Path(os.environ.get("SENJIN_QUESTION_BANK", ROOT / "question_bank")),
     notes_path=Path(p) if (p := os.environ.get("SENJIN_NOTES_PATH")) else None,
+    question_sets=[
+        n.strip() for n in os.environ.get("SENJIN_QUESTION_SET", "").split(",") if n.strip()
+    ]
+    or None,
 )
 
 mcp = MCPServer("senjin-interview")

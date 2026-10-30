@@ -41,6 +41,17 @@ class OllamaClient:
         self.temperature = temperature
         self._client = ollama.AsyncClient(host=host)
 
+    async def warm(self, messages: list[Message]) -> None:
+        """Load the model and read the fixed start of the prompt, so the first real turn is fast."""
+        await self._client.chat(
+            model=self.model,
+            messages=messages,
+            stream=False,
+            think=False,
+            keep_alive="30m",
+            options={"temperature": self.temperature, "num_predict": 1},
+        )
+
     async def stream(
         self, messages: list[Message], tools: list[dict] | None = None
     ) -> AsyncIterator[Event]:

@@ -13,8 +13,11 @@ import time
 from collections.abc import AsyncIterator, Callable
 
 from senjin.interview.exemplars import ExemplarProvider
+from senjin.interview.lookup import relevant_lines
+from senjin.interview.praise import PraiseFilter
 from senjin.interview.prompts import (
     EXEMPLAR_HEADER,
+    HINT_FORMAT,
     KICKOFF,
     NOTE_FORMAT,
     NOTES,
@@ -32,7 +35,10 @@ _NO_MORE_QUESTIONS = re.compile(
     r"^(no|nope|nah|nothing)\b|no (more |other |further )?questions|that'?s (all|it)|"
     r"that is (all|it)|i'?m (good|all set|done|fine)|we'?re (good|done)|"
     r"nothing (else|more|further)|all good|^(thanks|thank you)\b|"
-    r"^(ok|okay),? (thanks|thank you|that'?s)",
+    r"^(ok|okay),? (thanks|thank you|that'?s)|"
+    r"(don'?t|do not|have no|haven'?t got|got no)\s+(have\s+)?(any\s+)?"
+    r"(other\s+|more\s+|further\s+|additional\s+)?questions?|"
+    r"\bi (don'?t|do not) have any\b|\bno questions\b|\bnone\b",
     re.IGNORECASE,
 )
 
@@ -40,6 +46,15 @@ _NO_MORE_QUESTIONS = re.compile(
 _STILL_ASKING = re.compile(
     r"\?|\b(but|actually|wait|also|one more|another|what|how|when|where|who|why|which|"
     r"can you|could you|tell me|do you|is there|are there)\b",
+    re.IGNORECASE,
+)
+
+# "Can you repeat the question?" is a request, not an answer: it must not use up a question.
+_REPEAT_REQUEST = re.compile(
+    r"\b(repeat|say (that|it|the question) again|come again|pardon|rephrase|"
+    r"(didn'?t|did not|couldn'?t|could not) (catch|hear|get|understand)|"
+    r"(what|which) (was|is) (the|that) question|sorry,? what|i don'?t understand "
+    r"(the|that|your) question)",
     re.IGNORECASE,
 )
 
@@ -56,7 +71,11 @@ class InterviewSession:
         prefetch: bool = False,
     ) -> None:
         self.prefetch = prefetch and tools is not None  # orchestrated mode
-        self._context = ""  # resume / job description for the current phase
+        self._context = ""  # resume and job description: fixed for the whole interview
+        self._job_description = ""
+        self._last_candidate_text = ""
+        self._last_asked = ""  # the question or follow-up most recently put to the candidate
+        self._free_turn = False  # the next interviewer turn does not use up the phase budget
         self._question: dict | None = None
         self._followups: list[str] = []
         self._question_new = False
@@ -76,19 +95,27 @@ class InterviewSession:
 
     async def open(self) -> AsyncIterator[str]:
         """The interviewer speaks first."""
+        await self._load_context()
         async for chunk in self._reply():
             yield chunk
 
     async def respond(self, candidate_text: str) -> AsyncIterator[str]:
         """Record the candidate's turn, advance the phase if due, stream the reply."""
         self._record("user", candidate_text)
+        self._last_candidate_text = candidate_text
+        await self._load_context()
         now = self.clock()
+        repeat = self.asks_to_repeat(candidate_text)
         if target := self.state.wrap_up_target(now):
             self.state.jump(target, now)
             await self._enter_phase()
+            repeat = False
         elif self._candidate_is_done(candidate_text):
             self.state.jump(Phase.SIGNOFF, now)
             await self._enter_phase()
+            repeat = False
+        elif repeat:
+            pass  # stay on the same question: it is asked again, not skipped
         elif self.state.due_to_advance(now):
             if self.state.advance(now) is None:
                 return
@@ -97,29 +124,72 @@ class InterviewSession:
         if self.exemplars:
             examples = await self.exemplars.examples(candidate_text, self.state.phase)
         self._undo_note = None
-        note = await self._turn_note() if self.prefetch else None
+        if repeat:
+            self._free_turn = True
+            note = NOTES["repeat"].format(previous=self._previous_interviewer_text())
+        else:
+            note = await self._turn_note() if self.prefetch else None
         async for chunk in self._reply(examples, note):
             yield chunk
+
+    def asks_to_repeat(self, text: str) -> bool:
+        in_questions = self.state.phase in (Phase.RESUME_DIVE, Phase.TECHNICAL)
+        short = len(text.split()) <= 14
+        return bool(self.prefetch and in_questions and short and _REPEAT_REQUEST.search(text))
+
+    def _previous_interviewer_text(self) -> str:
+        if self.state.phase == Phase.TECHNICAL and self._last_asked:
+            return self._last_asked
+        for message in reversed(self.history[:-1]):
+            if message["role"] == "assistant" and message.get("content"):
+                return message["content"]
+        return ""
+
+    def retract_candidate(self) -> None:
+        """The last candidate turn was an unfinished fragment; it is re-sent with the rest."""
+        if self.history and self.history[-1]["role"] == "user":
+            self.history.pop()
+            if self.log:
+                self.log.append("retract", "", self.state.phase.value)
 
     def _candidate_is_done(self, text: str) -> bool:
         """In Q&A, "no, I'm good" ends the interview: the candidate decides when Q&A is over."""
         in_qa = self.state.phase == Phase.CANDIDATE_QA and self.state.turns_in_phase >= 1
-        if not in_qa or len(text.split()) > 12 or _STILL_ASKING.search(text):
+        if not in_qa or len(text.split()) > 20 or _STILL_ASKING.search(text):
             return False
         return bool(_NO_MORE_QUESTIONS.search(text.strip()))
 
+    @property
+    def context(self) -> str:
+        """The resume and job description in the system prompt (empty until loaded)."""
+        return self._context
+
+    async def warm(self) -> None:
+        """Before the call: load the model and have it read the long, fixed system prompt."""
+        await self._load_context()
+        warm = getattr(self.llm, "warm", None)
+        if self.prefetch and warm:
+            system = {"role": "system", "content": f"{SYSTEM_PROMPT}{self._context}"}
+            await warm([system, {"role": "user", "content": KICKOFF}])
+
+    async def _load_context(self) -> None:
+        """Orchestrated mode: put the resume and job description in the system prompt up front.
+
+        The system prompt then never changes, so Ollama reuses its cache across phase changes
+        instead of re-reading the whole prompt (that cost 5 to 9 seconds on phase-change turns).
+        """
+        if not self.prefetch or self._context:
+            return
+        resume = await self._fetch("get_candidate_resume")
+        self._job_description = await self._fetch("get_job_description")
+        self._context = (
+            f"\n\nCandidate resume:\n{resume}\n\nJob description:\n{self._job_description}"
+        )
+
     async def _enter_phase(self) -> None:
         """Orchestrated mode: load what the new phase needs, without a model round trip."""
-        self._context = ""
-        if not self.prefetch:
-            return
-        phase = self.state.phase
-        if phase == Phase.RESUME_DIVE:
-            self._context = "\n\nCandidate resume:\n" + await self._fetch("get_candidate_resume")
-        elif phase == Phase.TECHNICAL:
+        if self.prefetch and self.state.phase == Phase.TECHNICAL:
             self._absorb_question(await self._fetch("get_next_technical_question"))
-        elif phase == Phase.CANDIDATE_QA:
-            self._context = "\n\nJob description:\n" + await self._fetch("get_job_description")
 
     async def _fetch(self, name: str) -> str:
         assert self.tools
@@ -139,6 +209,9 @@ class InterviewSession:
         if isinstance(data, dict) and data.get("prompt"):
             self._question = data
             self._followups = list(data.get("follow_ups") or [])
+            limit = self.state.follow_ups_per_question
+            if limit is not None:
+                self._followups = self._followups[:limit]
             self._question_new = True
         else:  # bank exhausted or lookup failed
             self._question, self._followups, self._question_new = None, [], False
@@ -153,19 +226,29 @@ class InterviewSession:
             if self._question_new and self._question:
                 self._question_new = False
                 self._undo_note = self._rearm_question
+                self._last_asked = self._question["prompt"]
                 return NOTES["ask"].format(q=self._question["prompt"])
             if self._followups:
                 follow_up = self._followups.pop(0)
                 self._undo_note = lambda: self._followups.insert(0, follow_up)
+                self._last_asked = follow_up
                 return NOTES["follow_up"].format(fu=follow_up)
             self._absorb_question(await self._fetch("get_next_technical_question"))
             if self._question_new and self._question:
                 self._question_new = False
                 self._undo_note = self._rearm_question
+                self._last_asked = self._question["prompt"]
                 return NOTES["next_question"].format(q=self._question["prompt"])
             return NOTES["probe"]
+        if phase == Phase.RESUME_DIVE and self.state.turns_in_phase >= 1:
+            angles = NOTES["resume_angles"]
+            return NOTES["resume_probe"].format(angle=angles[(self.state.turns_in_phase - 1) % 4])
         if phase == Phase.CANDIDATE_QA:
-            return NOTES["qa_open"] if self.state.turns_in_phase == 0 else NOTES["qa_answer"]
+            if self.state.turns_in_phase == 0:
+                return NOTES["qa_open"]
+            lines = relevant_lines(self._job_description, self._last_candidate_text)
+            hint = HINT_FORMAT.format(" | ".join(lines)) if lines else ""
+            return NOTES["qa_answer"] + hint
         if phase == Phase.SIGNOFF:
             return NOTES["signoff"]
         return None
@@ -181,7 +264,11 @@ class InterviewSession:
     ) -> AsyncIterator[str]:
         # One system message: some chat templates (qwen) mishandle several or trailing ones.
         phase = phase_message(self.state.phase, orchestrated=self.prefetch)
-        content = f"{SYSTEM_PROMPT}\nCurrent instruction: {phase}{self._context}"
+        if self.prefetch:  # the phase rides in the note so the system prompt stays identical
+            content = f"{SYSTEM_PROMPT}{self._context}"
+            note = f"{phase} {note}" if note else phase
+        else:
+            content = f"{SYSTEM_PROMPT}\nCurrent instruction: {phase}{self._context}"
         if examples:
             content += EXEMPLAR_HEADER + "\n\n".join(examples)
         system = {"role": "system", "content": content}
@@ -192,17 +279,22 @@ class InterviewSession:
             for round_ in range(MAX_TOOL_ROUNDS + 1):
                 messages: list[Message] = [system, *self.history]
                 if not self.history:
-                    messages.append({"role": "user", "content": KICKOFF})
+                    kickoff = KICKOFF + (NOTE_FORMAT.format(note) if note else "")
+                    messages.append({"role": "user", "content": kickoff})
                 elif note and messages[-1]["role"] == "user":
                     last = messages[-1]
                     messages[-1] = {**last, "content": last["content"] + NOTE_FORMAT.format(note)}
                 calls: list[ToolCall] = []
+                praise = PraiseFilter()  # holds each sentence back until praise is stripped
                 async for event in self.llm.stream(messages, tools):
                     if isinstance(event, ToolCall):
                         calls.append(event)
-                    else:
-                        parts.append(event)
-                        yield event
+                    elif text := praise.feed(event):
+                        parts.append(text)
+                        yield text
+                if tail := praise.flush():
+                    parts.append(tail)
+                    yield tail
                 if not calls or not self.tools:
                     break
                 await self._run_tools(calls)
@@ -214,7 +306,10 @@ class InterviewSession:
             text = "".join(parts).strip()
             if text:
                 self._record("assistant", text)
-                self.state.record_interviewer_turn()
+                if self._free_turn:  # a repeated question does not count as another one
+                    self._free_turn = False
+                else:
+                    self.state.record_interviewer_turn()
             # A goodbye that was cut off must not end the interview as if it had been said.
             if self.state.phase == Phase.SIGNOFF and completed:
                 self.state.finished = True

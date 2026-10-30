@@ -47,3 +47,5 @@ class Report(BaseModel):
     judge_model: str
     transcript: str
     redacted: bool = True
+    judge_recommendation: str | None = None  # what the judge said before the hiring bar applied
+    bar_notes: list[str] = Field(default_factory=list)  # why the bar changed it, if it did

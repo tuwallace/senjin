@@ -17,7 +17,7 @@ def test_defaults_are_five_questions_split_two_and_three():
     assert turns == {
         Phase.INTRO: 1,
         Phase.RESUME_DIVE: 2,
-        Phase.TECHNICAL: 3,
+        Phase.TECHNICAL: 6,  # three separate questions, each with one follow-up
         Phase.SIGNOFF: 1,
     }
 
@@ -75,11 +75,11 @@ def test_flags_override_environment():
 
 def test_default_interview_state_reads_the_environment(monkeypatch):
     monkeypatch.setenv("SENJIN_MAX_QUESTIONS", "4")
-    budgets = InterviewState().budgets
-    assert budgets[Phase.RESUME_DIVE].max_turns + budgets[Phase.TECHNICAL].max_turns == 4
+    budgets = InterviewState().budgets  # 2 background, 2 technical questions + 1 follow-up each
+    assert budgets[Phase.RESUME_DIVE].max_turns + budgets[Phase.TECHNICAL].max_turns == 2 + 4
     monkeypatch.delenv("SENJIN_MAX_QUESTIONS")
     budgets = InterviewState().budgets
-    assert budgets[Phase.RESUME_DIVE].max_turns + budgets[Phase.TECHNICAL].max_turns == 5
+    assert budgets[Phase.RESUME_DIVE].max_turns + budgets[Phase.TECHNICAL].max_turns == 2 + 6
 
 
 class Tools:
@@ -98,6 +98,7 @@ class Tools:
 async def test_interview_asks_exactly_n_questions_then_hands_over_to_candidate(n):
     cfg = InterviewConfig.from_env({"SENJIN_MAX_QUESTIONS": str(n)})
     session = InterviewSession(FakeLLM([]), state=cfg.state(), tools=Tools(), prefetch=True)
+    follow_ups = cfg.follow_ups
     spoken_by_phase: dict[str, int] = {}
 
     async def say(stream):
@@ -113,7 +114,9 @@ async def test_interview_asks_exactly_n_questions_then_hands_over_to_candidate(n
         in_qa = session.state.phase.value == "candidate_qa"
         await say(session.respond("No, I'm good." if in_qa else "an answer"))
         guard += 1
-    questions = spoken_by_phase["resume_dive"] + spoken_by_phase["technical"]
+    # background turns, then each technical question plus its follow-ups
+    questions = spoken_by_phase["resume_dive"] + spoken_by_phase["technical"] // (1 + follow_ups)
+    assert spoken_by_phase["technical"] == cfg.technical * (1 + follow_ups)
     assert questions == n
     assert spoken_by_phase["intro"] == 1 and spoken_by_phase["signoff"] == 1
     assert spoken_by_phase["candidate_qa"] == 1  # just the invitation, then "no, I'm good"
@@ -245,3 +248,55 @@ def test_missing_dotenv_is_fine(tmp_path):
     from senjin.config import load_env_file
 
     assert load_env_file([tmp_path / "nope.env"]) == {}
+
+
+def test_hold_ms_default_env_flag_and_bounds():
+    assert InterviewConfig.from_env({}).hold_ms == 1500
+    assert InterviewConfig.from_env({"SENJIN_HOLD_MS": "0"}).hold_ms == 0
+    assert InterviewConfig.from_env({}).override(hold_ms=2500).hold_ms == 2500
+    with pytest.raises(ConfigError):
+        InterviewConfig.from_env({"SENJIN_HOLD_MS": "9000"})
+
+
+class NumberedTools(Tools):
+    def __init__(self):
+        self.n = 0
+
+    async def call(self, name, arguments):
+        if name == "get_next_technical_question":
+            self.n += 1
+            return (
+                f'{{"id": "q{self.n}", "topic": "t", "difficulty": "easy", '
+                f'"prompt": "Question number {self.n}?", "follow_ups": ["a?", "b?", "c?"]}}'
+            )
+        return "text"
+
+
+async def test_default_interview_asks_three_separate_technical_questions():
+    cfg = InterviewConfig.from_env({})
+    llm = FakeLLM([])
+    session = InterviewSession(llm, state=cfg.state(), tools=NumberedTools(), prefetch=True)
+    async for _ in session.open():
+        pass
+    guard = 0
+    while session.state.phase.value != "candidate_qa" and guard < 50:
+        async for _ in session.respond("an answer"):
+            pass
+        guard += 1
+    notes = [call[-1]["content"] for call in llm.calls]
+    asked = [n for n in notes if "Question number" in n and "exactly this question" in n]
+    follow_ups = [n for n in notes if "follow-up" in n and "adapting the wording" in n]
+    assert len(asked) == 3 and len(follow_ups) == 3  # three questions, one follow-up each
+    assert all(f"Question number {i}?" in "".join(asked) for i in (1, 2, 3))
+
+
+def test_follow_up_setting_and_bounds():
+    assert (
+        InterviewConfig.from_env({"SENJIN_FOLLOW_UPS": "0"}).budgets()[Phase.TECHNICAL].max_turns
+        == 3
+    )
+    assert InterviewConfig.from_env({}).override(follow_ups=2).follow_ups == 2
+    with pytest.raises(ConfigError):
+        InterviewConfig.from_env({"SENJIN_FOLLOW_UPS": "4"})
+    with pytest.raises(ConfigError):
+        InterviewConfig.from_env({}).override(follow_ups=-1)

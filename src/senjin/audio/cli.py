@@ -31,6 +31,8 @@ def voice_config(args) -> InterviewConfig:
         getattr(args, "idle_seconds", None),
         getattr(args, "silence_ms", None),
         getattr(args, "filler_ms", None),
+        getattr(args, "hold_ms", None),
+        getattr(args, "follow_ups", None),
     )
 
 
@@ -105,14 +107,15 @@ async def run(args) -> None:
                 barge_in=not args.no_barge_in,
                 idle_prompt_s=cfg.idle_seconds or None,
                 filler_delay_ms=cfg.filler_ms or None,
+                short_answer_hold_ms=cfg.hold_ms,
             ),
             TurnConfig(end_silence_ms=cfg.silence_ms),
             latency_path=out.with_suffix(".latency.jsonl"),
             on_text=lambda who, text: print(
-                f"\n{'Sen' if who == 'interviewer' else 'You'}: {text}"
+                f"\n{'Senjin' if who == 'interviewer' else 'You'}: {text}"
             ),
         )
-        print(f"Transcript: {out}\nUse headphones. Speak when Sen finishes; Ctrl-C to stop.")
+        print(f"Transcript: {out}\nUse headphones. Speak when Senjin finishes; Ctrl-C to stop.")
         try:
             await loop.run(mic_frames())
         except (KeyboardInterrupt, asyncio.CancelledError):
@@ -170,10 +173,12 @@ async def simulate(args) -> None:
         )
         loop = VoiceLoop(
             session, SileroVAD(SILERO_PATH), stt, tts, SilentPlayer(tts.sample_rate),
-            VoiceConfig(filler_delay_ms=cfg.filler_ms or None),
+            VoiceConfig(filler_delay_ms=cfg.filler_ms or None, short_answer_hold_ms=cfg.hold_ms),
             TurnConfig(end_silence_ms=cfg.silence_ms),
             latency_path=out.with_suffix(".latency.jsonl"),
-            on_text=lambda who, text: print(f"{'Sen' if who == 'interviewer' else 'You'}: {text}"),
+            on_text=lambda who, text: print(
+                f"{'Senjin' if who == 'interviewer' else 'You'}: {text}"
+            ),
         )  # fmt: skip
         quiet = np.zeros(FRAME, dtype=np.float32)
 
@@ -229,6 +234,8 @@ def main() -> None:
     )
     run_p.add_argument("--silence-ms", type=int, help="env SENJIN_SILENCE_MS, default 1000")
     run_p.add_argument("--filler-ms", type=int, help="env SENJIN_FILLER_MS, default 1100 (0 = off)")
+    run_p.add_argument("--hold-ms", type=int, help="env SENJIN_HOLD_MS, default 1500 (0 = off)")
+    run_p.add_argument("--follow-ups", type=int, help="env SENJIN_FOLLOW_UPS, default 1 (0 to 3)")
     run_p.add_argument(
         "--max-questions", type=int, help="questions to ask (env SENJIN_MAX_QUESTIONS, default 5)"
     )
@@ -246,6 +253,8 @@ def main() -> None:
     sim_p.add_argument("--turns", type=int, default=6, help="candidate answers to play (max 6)")
     sim_p.add_argument("--silence-ms", type=int)
     sim_p.add_argument("--filler-ms", type=int)
+    sim_p.add_argument("--hold-ms", type=int)
+    sim_p.add_argument("--follow-ups", type=int)
     sim_p.add_argument("--out", type=Path)
     rep = sub.add_parser("report", help="summarize a .latency.jsonl file")
     rep.add_argument("path", type=Path)

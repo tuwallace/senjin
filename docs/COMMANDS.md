@@ -36,6 +36,8 @@ By default Senjin asks 5 interview questions: 2 about the candidate's background
 | `SENJIN_IDLE_SECONDS` | 25 | silence before "Are you still there?" (0 = off) |
 | `SENJIN_SILENCE_MS` | 1000 | silence that ends the candidate's turn (200 to 3000); lower is snappier but may cut people off |
 | `SENJIN_FILLER_MS` | 1100 | if no reply has started this long after the candidate stops, play a short "Okay, right." or "I see." (picked at random) (0 = off) |
+| `SENJIN_HOLD_MS` | 1500 | after a short (under 14 words) or trailing-off answer to a background or technical question, wait this much longer for the candidate to carry on before replying; if they do, both parts are answered as one (0 = off) |
+| `SENJIN_FOLLOW_UPS` | 1 | follow-ups after each technical question (0 to 3). `SENJIN_MAX_QUESTIONS` counts main questions, so the default asks 2 background questions and 3 separate technical questions, each followed by one follow-up |
 
 ```bash
 export SENJIN_MAX_QUESTIONS=8            # for this terminal session
@@ -43,7 +45,7 @@ SENJIN_MAX_QUESTIONS=3 uv run senjin-voice run      # for one command
 uv run senjin-meet run URL --max-questions 4        # a flag beats the variable
 ```
 
-The candidate's own Q&A has no limit: Sen keeps answering until the candidate says they are done (for example "no, I'm good" or "that's all"), the time box (`SENJIN_MAX_MINUTES`) runs out, or the candidate goes silent.
+The candidate's own Q&A has no limit: Senjin keeps answering until the candidate says they are done (for example "no, I'm good" or "that's all"), the time box (`SENJIN_MAX_MINUTES`) runs out, or the candidate goes silent.
 
 The filler clip fills dead air: the clips are recorded with Piper at startup, play only when the reply is slow, never twice in a row, and are not part of what the model remembers (the transcript logs them as `filler` rows). Flags: `--silence-ms`, `--filler-ms` on `senjin-voice run`, `senjin-voice simulate` and `senjin-meet run`; `senjin-voice report` shows how often the filler played.
 
@@ -126,6 +128,7 @@ Use your own candidate and question bank:
 ```bash
 export SENJIN_CANDIDATE_DIR=data/candidates/jane      # needs resume.md and job_description.md
 export SENJIN_QUESTION_BANK=question_bank             # *.yaml files
+export SENJIN_QUESTION_SET=fullstack                  # ask only from these files (default: all)
 export SENJIN_NOTES_PATH=data/sessions/notes.jsonl    # where record_note writes
 uv run senjin-chat
 ```
@@ -175,6 +178,8 @@ It prints one line per run, the valid-JSON rate, and PASS or FAIL for the score 
 How it stays honest: output is schema-constrained, retried once if invalid, and every cited quote is checked against the candidate's actual words. Claims with invented quotes are dropped and confidence is set to low. If nothing verifies, the command fails instead of writing a report.
 
 Unit tests (fake judge, no Ollama): `uv run pytest tests/test_assess.py`
+
+The hiring bar is applied in code after the judge answers: **Hire** needs technical 7 or more, communication 5 or more and no question below 4 (constants at the top of the bar in `src/senjin/assess/judge.py`). The command prints each question's judge score, and the report says what the judge recommended and whether the bar changed it. The agent introduces itself as Senjin.
 
 ## Phase 4: Anthropic dataset
 
@@ -253,7 +258,7 @@ Hold a spoken interview. Use headphones, or the interviewer will hear itself; ma
 ```bash
 uv run senjin-voice run
 uv run senjin-voice run --silence-ms 600        # end your turn after 0.6 s of silence (default 0.8 s)
-uv run senjin-voice run --no-barge-in           # speakers instead of headphones: ignore the mic while Sen talks
+uv run senjin-voice run --no-barge-in           # speakers instead of headphones: ignore the mic while Senjin talks
 uv run senjin-voice run --model llama3.1:8b-instruct-q8_0 --stt-model ggml-base.en.bin
 ```
 
@@ -263,7 +268,7 @@ Stop with Ctrl-C. Outputs go to `data/sessions/voice-<timestamp>.jsonl` (transcr
 uv run senjin-voice report data/sessions/voice-<timestamp>.latency.jsonl
 ```
 
-Barge-in: if you speak for about 300 ms while Sen is talking, playback stops at once and the transcript keeps only the words Sen actually said (an `interrupt` row records them).
+Barge-in: if you speak for about 300 ms while Senjin is talking, playback stops at once and the transcript keeps only the words Senjin actually said (an `interrupt` row records them).
 
 Tests (no audio hardware or models needed): `uv run pytest tests/test_voice.py`
 

@@ -36,6 +36,12 @@ def _env_budgets() -> dict[Phase, Budget]:
     return InterviewConfig.from_env().budgets()
 
 
+def _env_follow_ups() -> int | None:
+    from senjin.config import InterviewConfig
+
+    return InterviewConfig.from_env().follow_ups
+
+
 @dataclass
 class InterviewState:
     budgets: dict[Phase, Budget] = field(default_factory=lambda: _env_budgets())
@@ -45,6 +51,8 @@ class InterviewState:
     finished: bool = False
     max_total_seconds: float | None = None  # hard time box for the whole interview
     started_at: float = 0.0
+    # follow-ups asked after each technical question (None: every follow-up the bank has)
+    follow_ups_per_question: int | None = field(default_factory=lambda: _env_follow_ups())
 
     def start(self, now: float) -> None:
         self.started_at = self.phase_started_at = now

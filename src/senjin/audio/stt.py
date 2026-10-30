@@ -27,6 +27,7 @@ class STT(Protocol):
 
 def clean_transcript(text: str) -> str:
     text = _NOISE.sub(" ", text)
+    text = re.sub(r"(^|\s)(>>+|-{1,2})(?=\s|$)", " ", text)  # speaker-change marks
     text = re.sub(r"\s+", " ", text).strip()
     return "" if text.lower() in _HALLUCINATIONS else text
 
@@ -48,6 +49,7 @@ class WhisperServerSTT:
         self.url = f"http://127.0.0.1:{port}"
         self.port = port
         self._proc: subprocess.Popen | None = None
+        self.prompt = ""  # names and terms to expect (from the resume), so they are spelled right
 
     async def start(self, timeout: float = 60.0) -> None:
         if self._proc or await self._alive():
@@ -81,9 +83,16 @@ class WhisperServerSTT:
             self._proc = None
 
     async def transcribe(self, audio: np.ndarray) -> str:
-        files = {"file": ("audio.wav", to_wav_bytes(audio), "audio/wav")}
+        # Whisper tends to drop the first word of audio that starts abruptly: lead in with silence.
+        padded = np.concatenate([np.zeros(RATE * 3 // 10, dtype=audio.dtype), audio])
+        files = {"file": ("audio.wav", to_wav_bytes(padded), "audio/wav")}
         data = {"temperature": "0.0", "response_format": "json", "language": "en"}
+        if self.prompt:
+            data["prompt"] = self.prompt
         async with httpx.AsyncClient(timeout=60) as c:
             r = await c.post(self.url + "/inference", files=files, data=data)
         r.raise_for_status()
-        return clean_transcript(r.json().get("text", ""))
+        text = clean_transcript(r.json().get("text", ""))
+        if self.prompt and text.lower().startswith(self.prompt.lower()[:24]):
+            return ""  # whisper echoed its hint on near-silence
+        return text

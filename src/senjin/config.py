@@ -4,9 +4,12 @@ Settings can also be kept in a .env file (see .env.example); exported variables 
 
 SENJIN_MAX_QUESTIONS     questions asked in the background + technical parts (default 5, 2 to 30)
 SENJIN_RESUME_QUESTIONS  how many of those are about the resume (default: 40%, at least 1)
+SENJIN_FOLLOW_UPS        follow-ups after each technical question (default 1, 0 to 3)
 SENJIN_MAX_MINUTES       time box for the whole interview (default 45)
 SENJIN_IDLE_SECONDS      silence before "Are you still there?" (default 25, 0 turns it off)
 SENJIN_SILENCE_MS        silence that ends the candidate's turn (default 1000, 200 to 3000)
+SENJIN_HOLD_MS           after a short or unfinished answer, wait this much longer for the candidate
+                         to carry on before replying (default 1500, 0 turns it off)
 SENJIN_FILLER_MS         play "Okay, right." or "I see." if no reply has started this long
                          after the candidate stops (default 1100, 0 turns it off)
 
@@ -107,6 +110,8 @@ class InterviewConfig:
     idle_seconds: float = 25.0
     silence_ms: int = 1000
     filler_ms: int = 1100
+    hold_ms: int = 1500
+    follow_ups: int = 1  # per technical question; each main question gets its own turn first
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "InterviewConfig":
@@ -124,6 +129,8 @@ class InterviewConfig:
             idle_seconds=_number(env, "SENJIN_IDLE_SECONDS", 25, 0, 3600),
             silence_ms=int(_number(env, "SENJIN_SILENCE_MS", 1000, 200, 3000)),
             filler_ms=int(_number(env, "SENJIN_FILLER_MS", 1100, 0, 10000)),
+            hold_ms=int(_number(env, "SENJIN_HOLD_MS", 1500, 0, 5000)),
+            follow_ups=int(_number(env, "SENJIN_FOLLOW_UPS", 1, 0, 3)),
         )
 
     def with_max_questions(self, n: int) -> "InterviewConfig":
@@ -138,6 +145,8 @@ class InterviewConfig:
         idle_seconds: float | None = None,
         silence_ms: int | None = None,
         filler_ms: int | None = None,
+        hold_ms: int | None = None,
+        follow_ups: int | None = None,
     ) -> "InterviewConfig":
         """Command-line flags win over the environment."""
         cfg = self.with_max_questions(max_questions) if max_questions is not None else self
@@ -149,6 +158,12 @@ class InterviewConfig:
             cfg = replace(cfg, silence_ms=silence_ms)
         if filler_ms is not None:
             cfg = replace(cfg, filler_ms=filler_ms)
+        if hold_ms is not None:
+            cfg = replace(cfg, hold_ms=hold_ms)
+        if follow_ups is not None:
+            if not 0 <= follow_ups <= 3:
+                raise ConfigError(f"follow-ups must be between 0 and 3, got {follow_ups}")
+            cfg = replace(cfg, follow_ups=follow_ups)
         return cfg
 
     @property
@@ -165,7 +180,7 @@ class InterviewConfig:
         turns = {
             Phase.INTRO: 1,
             Phase.RESUME_DIVE: self.resume,
-            Phase.TECHNICAL: self.technical,
+            Phase.TECHNICAL: self.technical * (1 + self.follow_ups),  # question + its follow-ups
             Phase.SIGNOFF: 1,
         }
         budgets = {p: Budget(n, DEFAULT_BUDGETS[p].max_seconds) for p, n in turns.items()}
@@ -173,11 +188,16 @@ class InterviewConfig:
         return {p: budgets[p] for p in Phase}
 
     def state(self) -> InterviewState:
-        return InterviewState(budgets=self.budgets(), max_total_seconds=self.max_minutes * 60)
+        return InterviewState(
+            budgets=self.budgets(),
+            max_total_seconds=self.max_minutes * 60,
+            follow_ups_per_question=self.follow_ups,
+        )
 
     def describe(self) -> str:
         return (
             f"Interview plan: {self.max_questions} questions ({self.resume} background + "
-            f"{self.technical} technical), then as many answers to the candidate's own questions "
-            f"as they want, within {self.max_minutes:g} minutes."
+            f"{self.technical} separate technical questions, each with up to {self.follow_ups} "
+            f"follow-up), then as many answers to the candidate's own questions as they want, "
+            f"within {self.max_minutes:g} minutes."
         )

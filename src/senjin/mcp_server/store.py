@@ -28,9 +28,12 @@ class Question:
         }
 
 
-def load_questions(bank_dir: Path) -> list[Question]:
+def load_questions(bank_dir: Path, sets: list[str] | None = None) -> list[Question]:
+    """Every question in the bank, or only the files named in `sets` (file names without .yaml)."""
     questions: list[Question] = []
     for path in sorted(bank_dir.glob("*.yaml")):
+        if sets and path.stem not in sets:
+            continue
         questions += [Question(**item) for item in yaml.safe_load(path.read_text()) or []]
     ids = [q.id for q in questions]
     if len(ids) != len(set(ids)):
@@ -41,9 +44,17 @@ def load_questions(bank_dir: Path) -> list[Question]:
 class InterviewStore:
     """One store per interview: it remembers which questions were already asked."""
 
-    def __init__(self, candidate_dir: Path, bank_dir: Path, notes_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        candidate_dir: Path,
+        bank_dir: Path,
+        notes_path: Path | None = None,
+        question_sets: list[str] | None = None,
+    ) -> None:
         self.candidate_dir = candidate_dir
-        self.questions = load_questions(bank_dir)
+        self.questions = load_questions(bank_dir, question_sets)
+        if not self.questions:
+            raise ValueError(f"no questions in {bank_dir} for sets {question_sets}")
         self.notes_path = notes_path
         self.asked: list[str] = []
 

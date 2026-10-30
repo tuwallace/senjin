@@ -7,4 +7,4 @@ Phase 4 uses transcripts from the [Anthropic Interviewer dataset](https://huggin
 
 ## Status
 
-Phases 0 to 7 are built (tags `v0.1` to `v0.7`). Not yet run end to end against a real Google Meet with a human candidate; see `docs/COMMANDS.md` and `docs/adr/`. Hiring recommendations are advisory only.
+Phases 0 to 7 are built (tags `v0.1` to `v0.7`). Not yet run end to end against a real Google Meet with a human candidate; see `docs/COMMANDS.md`, `docs/KNOWN_ISSUES.md` and `docs/adr/`. Hiring recommendations are advisory only.

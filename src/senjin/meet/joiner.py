@@ -29,7 +29,7 @@ class MeetBot:
         speaker_name: str | None = None,
         headless: bool = False,
         channel: str | None = "chrome",
-        guest_name: str = "Sen (AI interviewer)",
+        guest_name: str = "Senjin (AI interviewer)",
         extra_args: list[str] | None = None,
     ) -> None:
         self.extra_args = extra_args or []
@@ -162,6 +162,23 @@ class MeetBot:
             gone = 0 if await self.in_call() else gone + 1
             await asyncio.sleep(poll)
 
-    async def leave(self) -> None:
-        if self.page and await self.in_call():
-            await self._button(sel.LEAVE_BUTTON).first.click()
+    async def leave(self, attempts: int = 3) -> bool:
+        """Hang up. True once the call is gone; drops the page if the button does not work."""
+        if not self.page:
+            return True
+        for _ in range(attempts):
+            if not await self.in_call():
+                return True
+            try:
+                await self._button(sel.LEAVE_BUTTON).first.click(timeout=3000)
+            except Exception:
+                pass
+            for _ in range(8):  # the call screen takes a moment to go away
+                if not await self.in_call():
+                    return True
+                await asyncio.sleep(0.5)
+        try:
+            await self.page.goto("about:blank")  # last resort: leaving the page ends the call
+        except Exception:
+            return False
+        return True

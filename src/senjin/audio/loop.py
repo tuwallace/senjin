@@ -7,6 +7,7 @@ interviewer's history keeps only the words that were actually spoken.
 import asyncio
 import json
 import random
+import re
 import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import aclosing
@@ -51,6 +52,8 @@ class AudioOut(Protocol):
 class VoiceConfig:
     barge_in: bool = True
     barge_in_ms: int = 300  # candidate speech needed to cut the interviewer off
+    short_answer_hold_ms: int = 0  # wait this much longer after a short or unfinished answer
+    short_answer_words: int = 14  # answers shorter than this are held
     idle_prompt_s: float | None = 25.0  # silence before "Are you still there?" (None disables)
     max_idle_prompts: int = 2  # prompts before the call is ended politely
     max_consecutive_errors: int = 3  # failed replies in a row before the call is ended
@@ -84,6 +87,9 @@ class VoiceLoop:
         self._turn: asyncio.Task | None = None
         self._stt_audio: np.ndarray | None = None
         self._carry: np.ndarray | None = None
+        self._in_flight: np.ndarray | None = None  # audio of the utterance being answered
+        self._redo_opening = False  # the greeting was cut off before a word of it was heard
+        self._holding = False  # waiting to see if a short answer carries on
         self._idle_since = clock()
         self._idle_prompts = 0
         self._errors_in_row = 0
@@ -130,6 +136,7 @@ class VoiceLoop:
     def _collect_error(self, task: asyncio.Task) -> None:
         if not task.cancelled() and task.exception():
             self.errors.append(task.exception())
+            self._in_flight = None
             self._errors_in_row += 1
             self._recover = True
 
@@ -170,10 +177,23 @@ class VoiceLoop:
     async def _interrupt(self) -> None:
         self.interruptions += 1
         started = [t for t in self.player.stop() if not t.startswith(FILLER_TAG)]
+        in_flight = self._in_flight
         if self._stt_audio is not None:  # cut in while the last utterance was being transcribed
             self._carry = self._stt_audio
+        holding = self._holding
         await self._cancel_turn()
+        if holding:  # the answer was only being held: the interview has not seen it yet
+            self._holding, self._carry, self._in_flight = False, in_flight, None
+            return
         self.session.interrupt(" ".join(started))
+        if not started and self._stt_audio is None and in_flight is not None:
+            # The candidate carried on before any reply was heard: their earlier words were an
+            # unfinished fragment, so answer both parts together instead of as two turns.
+            self.session.retract_candidate()
+            self._carry = in_flight
+        self._in_flight = None
+        if not started and not any(m["role"] == "assistant" for m in self.session.history):
+            self._redo_opening = True  # noise or a cough killed the greeting: say it again
 
     @property
     def _saying_goodbye(self) -> bool:
@@ -198,11 +218,35 @@ class VoiceLoop:
         rec["stt_s"] = round(self.clock() - t0, 3)
         self._stt_audio = None
         if not text:
+            if self._redo_opening:  # that was only noise: start the interview again
+                self._redo_opening = False
+                await self._speak(self.session.open(), {"turn": "open"}, None)
             return
+        self._redo_opening = False
         rec["text"] = text
+        self._in_flight = audio
+        if self._should_hold(text):
+            self._holding = True
+            t_hold = self.clock()
+            await asyncio.sleep(self.config.short_answer_hold_ms / 1000)
+            self._holding = False
+            rec["held_s"] = round(self.clock() - t_hold, 3)
         self.on_text("candidate", text)
         await self._speak(self.session.respond(text), rec, t_end)
+        self._in_flight = None
         self._errors_in_row = 0
+
+    def _should_hold(self, text: str) -> bool:
+        """A short or trailing-off answer to a question: the candidate may not be finished."""
+        if not self.config.short_answer_hold_ms:
+            return False
+        if self.session.state.phase not in (Phase.RESUME_DIVE, Phase.TECHNICAL):
+            return False
+        if self.session.asks_to_repeat(text):
+            return False
+        if len(text.split()) <= 5 and _COMPLETE_NON_ANSWER.search(text):
+            return False
+        return len(text.split()) < self.config.short_answer_words or looks_unfinished(text)
 
     async def _speak(self, stream, rec: dict, t_end: float | None) -> None:
         self.player.reset()
@@ -238,6 +282,7 @@ class VoiceLoop:
             and self._fillers
             and self.config.filler_delay_ms
             and not self._filled_last_turn
+            and len(rec.get("text", "").split()) >= 3  # never after "Hello?" or "Yes."
         ):
             filler = asyncio.create_task(self._filler_after(rec, t_end))
         try:
@@ -284,6 +329,26 @@ class VoiceLoop:
             self.latency_path.parent.mkdir(parents=True, exist_ok=True)
             with self.latency_path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(rec) + "\n")
+
+
+# A short answer that is complete as it stands: waiting longer for more would only add dead air.
+_COMPLETE_NON_ANSWER = re.compile(
+    r"^\W*(i\s+)?(don'?t|do not)\s+know\b|^\W*(i\s+have\s+)?no\s+idea\b|"
+    r"^\W*(i'?m\s+)?not\s+(sure|certain)\b|^\W*(yes|no|yeah|yep|nope|correct|right|sure)\W*$|"
+    r"^\W*i\s+(can'?t|cannot)\s+(say|answer)\b",
+    re.IGNORECASE,
+)
+_TRAILING = re.compile(
+    r"\b(and|so|but|because|or|the|a|an|to|of|that|which|with|um|uh|like|then|if|when|is|are)"
+    r"\W*$",
+    re.IGNORECASE,
+)
+
+
+def looks_unfinished(text: str) -> bool:
+    """True when the transcript ends on a connecting word or without a closing mark."""
+    stripped = text.strip()
+    return bool(_TRAILING.search(stripped)) or not stripped.endswith((".", "?", "!", '"'))
 
 
 def summarize(records: list[dict]) -> str:
