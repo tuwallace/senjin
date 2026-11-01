@@ -27,9 +27,18 @@ from senjin.interview.prompts import (
 from senjin.interview.state import InterviewState, Phase
 from senjin.interview.transcript import TranscriptLog
 from senjin.llm.client import LLMClient, Message, ToolCall
+from senjin.llm.decide import Decider
 from senjin.llm.tools import ToolRunner
 
 MAX_TOOL_ROUNDS = 3
+
+# Asking the decision model only when the rules say "not done", and acting only on a confident
+# yes: ending the interview early is worse than one more question.
+DONE_QUESTION = (
+    "The candidate has said they have no more questions and the interview can end. Answer low "
+    "if they asked a question, want to ask something, or are still thinking."
+)
+DONE_THRESHOLD = 0.8
 
 _NO_MORE_QUESTIONS = re.compile(
     r"^(no|nope|nah|nothing)\b|no (more |other |further )?questions|that'?s (all|it)|"
@@ -78,7 +87,9 @@ class InterviewSession:
         tools: ToolRunner | None = None,
         exemplars: ExemplarProvider | None = None,
         prefetch: bool = False,
+        decider: Decider | None = None,
     ) -> None:
+        self.decider = decider
         self.prefetch = prefetch and tools is not None  # orchestrated mode
         self._context = ""  # resume and job description: fixed for the whole interview
         self._job_description = ""
@@ -119,7 +130,7 @@ class InterviewSession:
             self.state.jump(target, now)
             await self._enter_phase()
             repeat = False
-        elif self._candidate_is_done(candidate_text):
+        elif await self._is_done(candidate_text):
             self.state.jump(Phase.SIGNOFF, now)
             await self._enter_phase()
             repeat = False
@@ -160,6 +171,20 @@ class InterviewSession:
             self.history.pop()
             if self.log:
                 self.log.append("retract", "", self.state.phase.value)
+
+    async def _is_done(self, text: str) -> bool:
+        """The rules decide; a decision model may only add a sign-off the rules missed."""
+        if self._candidate_is_done(text):
+            return True
+        in_qa = self.state.phase == Phase.CANDIDATE_QA and self.state.turns_in_phase >= 1
+        if not (self.decider and in_qa) or "?" in text or len(text.split()) > 60:
+            return False
+        p = await self.decider.probability(
+            "done",
+            {"interviewer_said": self._previous_interviewer_text()[-300:], "candidate_said": text},
+            DONE_QUESTION,
+        )
+        return p is not None and p >= DONE_THRESHOLD
 
     def _candidate_is_done(self, text: str) -> bool:
         """In Q&A, "no, I'm good" ends the interview: the candidate decides when Q&A is over."""

@@ -14,6 +14,7 @@ from senjin.interview.session import InterviewSession
 from senjin.interview.state import DEFAULT_BUDGETS, Budget, InterviewState, Phase
 from senjin.interview.transcript import TranscriptLog
 from senjin.llm.client import DEFAULT_MODEL, LLMClient, Message, OllamaClient
+from senjin.llm.decide import decider_for
 from senjin.llm.tools import open_mcp_tools
 from senjin.mcp_server.store import bank_label
 from senjin.plan import PLAN, plan_from_args
@@ -115,6 +116,7 @@ async def run_simulation(
             tools=tools,
             exemplars=exemplars,
             prefetch=orchestrate,
+            decider=decider_for(InterviewConfig.from_env().decision_model),
         )
         if own:
             await session.warm()

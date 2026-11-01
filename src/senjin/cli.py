@@ -12,6 +12,7 @@ from senjin.interview.exemplars import ExemplarIndex
 from senjin.interview.session import InterviewSession
 from senjin.interview.transcript import TranscriptLog
 from senjin.llm.client import DEFAULT_MODEL, OllamaClient
+from senjin.llm.decide import decider_for
 from senjin.llm.tools import open_mcp_tools
 from senjin.plan import PLAN, InterviewPlan, plan_from_args
 
@@ -46,6 +47,7 @@ async def run(
             state=cfg.state(),
             tools=tools,
             exemplars=ExemplarIndex.load(exemplars) if exemplars else None,
+            decider=decider_for(cfg.decision_model),
         )
         print(cfg.describe())
         print(f"Transcript: {out}\nType your answers. Ctrl-D or 'quit' to stop.")

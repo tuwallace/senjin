@@ -495,3 +495,49 @@ async def test_a_candidate_who_still_asks_something_is_not_cut_off(said):
         await collect(session.respond(text))
     await collect(session.respond(said))
     assert session.state.phase == Phase.CANDIDATE_QA
+
+
+class FakeDecider:
+    def __init__(self, p: float | None) -> None:
+        self.p = p
+        self.calls: list[dict[str, str]] = []
+
+    async def probability(self, name, state, instructions):
+        self.calls.append(state)
+        return self.p
+
+
+async def _in_qa(decider):
+    session = orchestrated(FakeLLM([]), candidate_qa=3)
+    session.decider = decider
+    await collect(session.open())
+    for text in ["ready", "project", "answer"]:
+        await collect(session.respond(text))
+    assert session.state.phase == Phase.CANDIDATE_QA
+    return session
+
+
+async def test_decision_model_adds_a_sign_off_the_rules_missed():
+    decider = FakeDecider(0.95)
+    session = await _in_qa(decider)
+    await collect(session.respond("Yeah, that covers everything for me, thanks."))
+    assert session.state.phase == Phase.SIGNOFF
+    assert decider.calls and "covers everything" in decider.calls[0]["candidate_said"]
+
+
+@pytest.mark.parametrize("p", [0.79, 0.1, None])
+async def test_a_doubtful_or_missing_decision_keeps_the_candidate_in_qa(p):
+    session = await _in_qa(FakeDecider(p))
+    await collect(session.respond("Hmm, let me think about it."))
+    assert session.state.phase == Phase.CANDIDATE_QA
+
+
+async def test_decision_model_is_not_asked_about_questions_or_by_default():
+    decider = FakeDecider(0.99)
+    session = await _in_qa(decider)
+    await collect(session.respond("What does on-call look like?"))
+    assert session.state.phase == Phase.CANDIDATE_QA
+    assert decider.calls == []  # a question is never a sign-off
+    plain = await _in_qa(None)
+    await collect(plain.respond("Yeah, that covers everything for me, thanks."))
+    assert plain.state.phase == Phase.CANDIDATE_QA  # rules alone, as before

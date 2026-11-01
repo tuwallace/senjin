@@ -17,6 +17,7 @@ from senjin.interview.exemplars import ExemplarIndex
 from senjin.interview.session import InterviewSession
 from senjin.interview.transcript import TranscriptLog
 from senjin.llm.client import OllamaClient
+from senjin.llm.decide import decider_for
 from senjin.llm.tools import FilteredTools, open_mcp_tools
 from senjin.mcp_server.store import bank_label
 from senjin.meet.audio import find_bridge
@@ -71,6 +72,7 @@ async def run_meet_interview(
                 exemplars=ExemplarIndex.load(exemplars) if exemplars else None,
                 prefetch=True,
                 state=cfg.state(),
+                decider=decider_for(cfg.decision_model),
             )
             log("Loading the model...")
             await session.warm()

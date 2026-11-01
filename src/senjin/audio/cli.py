@@ -17,6 +17,7 @@ from senjin.interview.exemplars import ExemplarIndex
 from senjin.interview.session import InterviewSession
 from senjin.interview.transcript import TranscriptLog
 from senjin.llm.client import DEFAULT_MODEL, OllamaClient
+from senjin.llm.decide import decider_for
 from senjin.llm.tools import FilteredTools, open_mcp_tools
 from senjin.mcp_server.store import bank_label
 from senjin.plan import PLAN, plan_from_args
@@ -104,6 +105,7 @@ async def run(args) -> None:
             tools=tools,
             prefetch=True,
             exemplars=ExemplarIndex.load(args.exemplars) if args.exemplars else None,
+            decider=decider_for(cfg.decision_model),
         )
         loop = VoiceLoop(
             session,
@@ -180,6 +182,7 @@ async def simulate(args) -> None:
             state=cfg.state(),
             tools=tools,
             prefetch=True,
+            decider=decider_for(cfg.decision_model),
         )
         loop = VoiceLoop(
             session, SileroVAD(SILERO_PATH), stt, tts, SilentPlayer(tts.sample_rate),
