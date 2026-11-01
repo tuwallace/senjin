@@ -79,7 +79,7 @@ def redact_rows(rows: list[dict], names: Iterable[str] = ()) -> list[dict]:
 def candidate_names(resume_text: str) -> list[str]:
     """Name from the resume's first heading, e.g. '# Jane Doe (sample candidate)'."""
     first = resume_text.strip().splitlines()[0] if resume_text.strip() else ""
-    name = re.sub(r"\(.*?\)", "", first.lstrip("# ")).strip()
+    name = re.sub(r"[*_`#]", "", re.sub(r"\(.*?\)", "", first)).strip()
     return [name] if name else []
 
 

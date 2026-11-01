@@ -5,10 +5,12 @@ import asyncio
 from pathlib import Path
 
 from senjin.audio.stt import DEFAULT_WHISPER_MODEL
+from senjin.candidate import JOB_DESCRIPTION, RESUME, add_candidate_arg, candidate_from_args
 from senjin.config import InterviewConfig, exit_on_config_error
 from senjin.llm.client import DEFAULT_MODEL
 from senjin.meet.accounts import ProfileError, keep_account, logout
 from senjin.meet.audio import HEAR_DEVICE, SPEAK_DEVICE, DeviceError, find_bridge
+from senjin.plan import PLAN, plan_from_args
 
 
 async def login() -> None:
@@ -57,9 +59,7 @@ def main() -> None:
     run.add_argument("url", help="https://meet.google.com/xxx-xxxx-xxx")
     run.add_argument("--model", default=DEFAULT_MODEL)
     run.add_argument("--exemplars", type=Path)
-    run.add_argument(
-        "--candidate-dir", type=Path, help="folder with resume.md and job_description.md"
-    )
+    add_candidate_arg(run)
     run.add_argument("--out", type=Path)
     run.add_argument("--admit-timeout", type=float, default=300)
     run.add_argument("--wait-candidate", type=float, default=600)
@@ -106,6 +106,11 @@ def main() -> None:
         else:
             from senjin.meet.runner import default_out, run_meet_interview
 
+            candidate_dir = candidate_from_args(
+                args.candidate_dir, files=(RESUME, JOB_DESCRIPTION), questions=True
+            )
+            plan = plan_from_args(candidate_dir)
+            print(plan.describe(candidate_dir / PLAN))
             out = args.out or default_out()
             asyncio.run(
                 run_meet_interview(
@@ -113,7 +118,7 @@ def main() -> None:
                     speak=args.speak_device, hear=args.hear_device, out=out,
                     admit_timeout=args.admit_timeout, wait_candidate=args.wait_candidate,
                     guest_name=args.guest_name,
-                    config=InterviewConfig.from_env().override(
+                    config=plan.apply(InterviewConfig.from_env()).override(
                         args.max_questions,
                         args.max_minutes,
                         args.idle_seconds,
@@ -122,7 +127,7 @@ def main() -> None:
                         args.hold_ms,
                         args.follow_ups,
                     ),
-                    exemplars=args.exemplars, candidate_dir=args.candidate_dir,
+                    exemplars=args.exemplars, candidate_dir=candidate_dir,
                 )
             )  # fmt: skip
             print(f"transcript: {out}")
@@ -137,6 +142,7 @@ def main() -> None:
                         args.judge or DEFAULT_JUDGE,
                         Path("data/reports"),
                         ROOT / "question_bank",
+                        candidate_dir,
                     )
                 )
     except (DeviceError, ProfileError) as exc:

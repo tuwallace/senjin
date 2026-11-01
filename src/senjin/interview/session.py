@@ -49,6 +49,15 @@ _STILL_ASKING = re.compile(
     re.IGNORECASE,
 )
 
+# A longer, polite sign-off that says so outright still ends the Q&A.
+_EXPLICITLY_DONE = re.compile(
+    r"no (more|other|further|additional) questions|"
+    r"(don'?t|do not) have (any )?(more |other |further )?questions|"
+    r"that'?s (all|everything)|nothing (else|more|further)|i'?m (all set|done)",
+    re.IGNORECASE,
+)
+_CARRIES_ON = re.compile(r"\b(but|actually|wait|also|one more|another)\b", re.IGNORECASE)
+
 # "Can you repeat the question?" is a request, not an answer: it must not use up a question.
 _REPEAT_REQUEST = re.compile(
     r"\b(repeat|say (that|it|the question) again|come again|pardon|rephrase|"
@@ -155,9 +164,13 @@ class InterviewSession:
     def _candidate_is_done(self, text: str) -> bool:
         """In Q&A, "no, I'm good" ends the interview: the candidate decides when Q&A is over."""
         in_qa = self.state.phase == Phase.CANDIDATE_QA and self.state.turns_in_phase >= 1
-        if not in_qa or len(text.split()) > 20 or _STILL_ASKING.search(text):
+        if not in_qa or "?" in text:
             return False
-        return bool(_NO_MORE_QUESTIONS.search(text.strip()))
+        words = len(text.split())
+        if words <= 20 and not _STILL_ASKING.search(text) and _NO_MORE_QUESTIONS.search(text):
+            return True
+        # "Thank you, that was helpful. I have no more questions. Have a great day!"
+        return words <= 60 and bool(_EXPLICITLY_DONE.search(text)) and not _CARRIES_ON.search(text)
 
     @property
     def context(self) -> str:

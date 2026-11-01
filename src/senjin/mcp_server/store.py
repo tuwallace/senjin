@@ -7,6 +7,9 @@ from pathlib import Path
 
 import yaml
 
+ROOT = Path(__file__).resolve().parents[3]
+GENERATED_BANK = "questions.yaml"  # written by senjin-review into the candidate folder
+
 
 @dataclass
 class Question:
@@ -16,9 +19,12 @@ class Question:
     prompt: str
     follow_ups: list[str] = field(default_factory=list)
     rubric: list[str] = field(default_factory=list)
+    skills: list[str] = field(default_factory=list)  # what it tests, for matching job requirements
+    basis: str = ""  # why this question was chosen; for the human reviewer only
+    origin: str = ""  # where it came from: a question_bank file or "generated"; reviewer only
 
     def public(self) -> dict:
-        """What the interviewer may see. The rubric stays out of the live model's context."""
+        """What the interviewer may see; rubric, skills, basis and origin are for reviewers only."""
         return {
             "id": self.id,
             "topic": self.topic,
@@ -28,16 +34,48 @@ class Question:
         }
 
 
+def _check_text_lists(item: dict, path: Path) -> None:
+    """follow_ups and rubric must be lists of text. An unquoted `Name: value` line is parsed by
+    YAML as a mapping, which would reach the judge and the interviewer as {'Name': 'value'}."""
+    for key in ("follow_ups", "rubric", "skills"):
+        bad = [v for v in item.get(key) or [] if not isinstance(v, str)]
+        if bad:
+            raise ValueError(
+                f"{path.name}: {item.get('id', '?')} {key} has a non-text item {bad[0]!r}; "
+                "put the whole line in quotes"
+            )
+
+
 def load_questions(bank_dir: Path, sets: list[str] | None = None) -> list[Question]:
     """Every question in the bank, or only the files named in `sets` (file names without .yaml)."""
     questions: list[Question] = []
     for path in sorted(bank_dir.glob("*.yaml")):
         if sets and path.stem not in sets:
             continue
-        questions += [Question(**item) for item in yaml.safe_load(path.read_text()) or []]
+        for item in yaml.safe_load(path.read_text()) or []:
+            _check_text_lists(item, path)
+            questions.append(Question(**item))
     ids = [q.id for q in questions]
     if len(ids) != len(set(ids)):
         raise ValueError("duplicate question ids in question bank")
+    return questions
+
+
+def bank_label(candidate_dir: Path) -> str:
+    """One line for the log: which questions this interview will ask."""
+    path = candidate_dir / GENERATED_BANK
+    return f"Question bank: {len(load_questions(path.parent, [path.stem]))} questions ({path})"
+
+
+def all_questions(bank_dir: Path, candidate_dir: Path) -> list[Question]:
+    """The shared bank plus the candidate's generated questions, for looking up rubrics."""
+    questions = load_questions(bank_dir)
+    generated = candidate_dir / GENERATED_BANK
+    if generated.is_file():
+        known = {q.id for q in questions}
+        questions += [
+            q for q in load_questions(generated.parent, [generated.stem]) if q.id not in known
+        ]
     return questions
 
 

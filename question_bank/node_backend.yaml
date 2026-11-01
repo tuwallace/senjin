@@ -1,0 +1,60 @@
+- id: node-api-structure
+  topic: backend
+  difficulty: medium
+  skills: ["api integration", "nodejs", "express", "nestjs", "api", "backend", "architecture"]
+  prompt: You are starting a Node.js API that will grow to dozens of endpoints. How would you structure it, and when would you pick Express over NestJS?
+  follow_ups:
+    - How would you keep validation and error responses consistent?
+    - How would you make it easy to test?
+  rubric:
+    - Describes layers such as routing, services and data access, with dependency injection or clear composition
+    - Compares Express flexibility with NestJS structure for team size and growth
+    - Centralizes validation, error handling and logging
+- id: node-data-modeling
+  topic: databases
+  difficulty: medium
+  skills: ["database", "postgres", "mysql", "sql", "nosql", "mongodb", "data modeling", "relational", "backend"]
+  prompt: A new feature stores orders with line items and a flexible set of product attributes. How would you decide what goes in PostgreSQL and what, if anything, goes in a NoSQL store?
+  follow_ups:
+    - How would you keep the two stores consistent?
+    - What would you index and why?
+  rubric:
+    - Uses relational storage for transactional data and justifies any NoSQL with a concrete access pattern
+    - Plans keys, indexes and schema evolution
+    - Addresses consistency between stores, or avoids needing two
+- id: node-migrations
+  topic: databases
+  difficulty: hard
+  skills: ["database", "postgres", "mysql", "sql", "migrations", "deployment", "zero downtime", "backend"]
+  prompt: You need to rename a heavily used column in a production PostgreSQL table without downtime. How would you do it?
+  follow_ups:
+    - How would you backfill the data safely?
+    - What is your rollback plan at each step?
+  rubric:
+    - Uses expand and contract steps with reads and writes that work on both versions
+    - Backfills in batches and verifies before switching over
+    - Has a rollback plan and watches metrics during each step
+- id: node-resilience
+  topic: backend
+  difficulty: medium
+  skills: ["nodejs", "api", "resilience", "retries", "timeouts", "circuit breaker", "idempotency", "microservices", "backend"]
+  prompt: An endpoint calls three external services and sometimes times out. How would you make it reliable?
+  follow_ups:
+    - How do you make a retried request safe?
+    - How would you tell users about a partial failure?
+  rubric:
+    - Sets timeouts, retries with backoff and jitter, and circuit breakers
+    - Makes retried operations idempotent
+    - Surfaces partial failure clearly and keeps logs, metrics and tracing
+- id: node-api-security
+  topic: security
+  difficulty: medium
+  skills: ["security", "nodejs", "api", "owasp", "authentication", "authorization", "encryption", "input validation", "backend"]
+  prompt: How do you secure a Node.js API that handles sensitive personal data, from the request to the database?
+  follow_ups:
+    - How do you handle authorization per route?
+    - What should an error response never contain?
+  rubric:
+    - Validates input, uses parameterized queries and applies rate limits
+    - Enforces authentication and least-privilege authorization on every route
+    - Protects data in transit and at rest and avoids leaking details in errors

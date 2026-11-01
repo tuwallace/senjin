@@ -20,3 +20,17 @@ words. In live Meet calls "Paratus Solutions" came out as "Parada Solutions" and
 
 Very short utterances ("Yes, I'm ready.") are sometimes transcribed oddly ("- I'm second.").
 The interview continues normally. Not yet shown to be caused by the vocabulary hint.
+
+### Review: shared-question reasons can be wrong or generic
+
+For shared bank questions, `basis` is the judge's one-line reason. It can be generic, and in an
+earlier version it cited an unrelated resume item. Questions written for the job description now
+get a deterministic basis (the requirement they test), so this only affects shared ones. Watch it
+during testing.
+
+### Review: requirement lists and coverage vary between runs
+
+The requirement list (10 to 13 items) and the coverage mapping change from run to run, the
+mapping is lenient (a question that merely mentions compliance may be credited with covering it),
+and the preferred section of a job description is sometimes skipped (the report warns when it
+is). Treat the coverage report as a guide to gaps, not a measurement.

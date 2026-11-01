@@ -5,7 +5,9 @@ Settings can also be kept in a .env file (see .env.example); exported variables 
 SENJIN_MAX_QUESTIONS     questions asked in the background + technical parts (default 5, 2 to 30)
 SENJIN_RESUME_QUESTIONS  how many of those are about the resume (default: 40%, at least 1)
 SENJIN_FOLLOW_UPS        follow-ups after each technical question (default 1, 0 to 3)
-SENJIN_MAX_MINUTES       time box for the whole interview (default 45)
+SENJIN_MAX_MINUTES       time box for the whole interview (default: scaled to the questions:
+                         about 2 minutes per question and follow-up, plus 10; 30 for the
+                         default 5 questions)
 SENJIN_IDLE_SECONDS      silence before "Are you still there?" (default 25, 0 turns it off)
 SENJIN_SILENCE_MS        silence that ends the candidate's turn (default 1000, 200 to 3000)
 SENJIN_HOLD_MS           after a short or unfinished answer, wait this much longer for the candidate
@@ -32,6 +34,9 @@ class ConfigError(ValueError):
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+MINUTES_PER_TURN = 2.0  # allowance per interviewer turn when the interview is long
+EXTRA_MINUTES = 10  # greeting, the candidate's own questions and the goodbye
 
 
 def _parse_env_line(line: str) -> tuple[str, str] | None:
@@ -106,12 +111,14 @@ def _number(env: Mapping[str, str], name: str, default: float, low: float, high:
 class InterviewConfig:
     max_questions: int = 5
     resume_questions: int | None = None  # None: derive from max_questions
-    max_minutes: float = 45.0
+    max_minutes: float | None = None  # None: scaled with the number of questions
     idle_seconds: float = 25.0
     silence_ms: int = 1000
     filler_ms: int = 1100
     hold_ms: int = 1500
     follow_ups: int = 1  # per technical question; each main question gets its own turn first
+    minutes_per_turn: float = MINUTES_PER_TURN
+    extra_minutes: float = EXTRA_MINUTES
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "InterviewConfig":
@@ -125,7 +132,11 @@ class InterviewConfig:
         return cls(
             max_questions=questions,
             resume_questions=resume,
-            max_minutes=_number(env, "SENJIN_MAX_MINUTES", 45, 1, 600),
+            max_minutes=(
+                _number(env, "SENJIN_MAX_MINUTES", 0, 1, 600)
+                if env.get("SENJIN_MAX_MINUTES", "").strip()
+                else None
+            ),
             idle_seconds=_number(env, "SENJIN_IDLE_SECONDS", 25, 0, 3600),
             silence_ms=int(_number(env, "SENJIN_SILENCE_MS", 1000, 200, 3000)),
             filler_ms=int(_number(env, "SENJIN_FILLER_MS", 1100, 0, 10000)),
@@ -176,6 +187,22 @@ class InterviewConfig:
     def technical(self) -> int:
         return self.max_questions - self.resume
 
+    def _phase_minutes(self, phase: Phase, turns: int) -> float:
+        """Time cap for a phase: the default, or about 2 minutes per interviewer turn if more."""
+        return max((DEFAULT_BUDGETS[phase].max_seconds or 0) / 60, self.minutes_per_turn * turns)
+
+    @property
+    def minutes(self) -> float:
+        """The whole-interview time box: SENJIN_MAX_MINUTES, else scaled to the question count."""
+        if self.max_minutes is not None:
+            return self.max_minutes
+        scaled = (
+            self._phase_minutes(Phase.RESUME_DIVE, self.resume)
+            + self._phase_minutes(Phase.TECHNICAL, self.technical * (1 + self.follow_ups))
+            + self.extra_minutes
+        )
+        return math.ceil(scaled)
+
     def budgets(self) -> dict[Phase, Budget]:
         turns = {
             Phase.INTRO: 1,
@@ -184,13 +211,15 @@ class InterviewConfig:
             Phase.SIGNOFF: 1,
         }
         budgets = {p: Budget(n, DEFAULT_BUDGETS[p].max_seconds) for p, n in turns.items()}
+        for phase in (Phase.RESUME_DIVE, Phase.TECHNICAL):
+            budgets[phase] = Budget(turns[phase], self._phase_minutes(phase, turns[phase]) * 60)
         budgets[Phase.CANDIDATE_QA] = DEFAULT_BUDGETS[Phase.CANDIDATE_QA]  # unlimited
         return {p: budgets[p] for p in Phase}
 
     def state(self) -> InterviewState:
         return InterviewState(
             budgets=self.budgets(),
-            max_total_seconds=self.max_minutes * 60,
+            max_total_seconds=self.minutes * 60,
             follow_ups_per_question=self.follow_ups,
         )
 
@@ -199,5 +228,5 @@ class InterviewConfig:
             f"Interview plan: {self.max_questions} questions ({self.resume} background + "
             f"{self.technical} separate technical questions, each with up to {self.follow_ups} "
             f"follow-up), then as many answers to the candidate's own questions as they want, "
-            f"within {self.max_minutes:g} minutes."
+            f"within {self.minutes:g} minutes."
         )

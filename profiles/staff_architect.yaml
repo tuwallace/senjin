@@ -1,0 +1,7 @@
+description: Staff, principal, lead or architect role; fewer questions, probed in depth (design, trade-offs, leadership).
+seniority: lead
+background_questions: 4
+technical_questions: 4
+follow_ups: 2
+minutes_per_turn: 2.5
+extra_minutes: 10

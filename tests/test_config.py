@@ -300,3 +300,25 @@ def test_follow_up_setting_and_bounds():
         InterviewConfig.from_env({"SENJIN_FOLLOW_UPS": "4"})
     with pytest.raises(ConfigError):
         InterviewConfig.from_env({}).override(follow_ups=-1)
+
+
+def test_time_boxes_scale_with_the_question_count_unless_set():
+    default = InterviewConfig.from_env({})
+    assert default.minutes == 30 and default.max_minutes is None  # 5 questions: 5 + 15 + 10
+    assert default.budgets()[Phase.TECHNICAL].max_seconds == 15 * 60  # the old caps still hold
+
+    long = InterviewConfig.from_env({"SENJIN_MAX_QUESTIONS": "18", "SENJIN_RESUME_QUESTIONS": "6"})
+    assert (long.resume, long.technical) == (6, 12)
+    budgets = long.budgets()
+    assert budgets[Phase.RESUME_DIVE] == type(budgets[Phase.RESUME_DIVE])(6, 12 * 60)
+    assert (
+        budgets[Phase.TECHNICAL].max_turns == 24 and budgets[Phase.TECHNICAL].max_seconds == 48 * 60
+    )
+    assert long.minutes == 70 and long.state().max_total_seconds == 70 * 60
+    assert "within 70 minutes" in long.describe()
+
+    pinned = InterviewConfig.from_env(
+        {"SENJIN_MAX_QUESTIONS": "18", "SENJIN_RESUME_QUESTIONS": "6", "SENJIN_MAX_MINUTES": "50"}
+    )
+    assert pinned.minutes == 50 and pinned.state().max_total_seconds == 3000
+    assert pinned.override(max_minutes=20).minutes == 20

@@ -1,0 +1,7 @@
+description: Any role. The standard short interview; also used when no other profile fits.
+seniority: mid
+background_questions: 2
+technical_questions: 3
+follow_ups: 1
+minutes_per_turn: 2.0
+extra_minutes: 10

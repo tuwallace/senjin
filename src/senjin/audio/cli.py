@@ -3,7 +3,6 @@
 import argparse
 import asyncio
 import json
-import os
 import time
 from contextlib import AsyncExitStack
 from pathlib import Path
@@ -12,12 +11,15 @@ from senjin.audio.loop import VoiceConfig, VoiceLoop, summarize
 from senjin.audio.models import SILERO_PATH, ensure_models
 from senjin.audio.stt import DEFAULT_WHISPER_MODEL, WhisperServerSTT
 from senjin.audio.vad import SileroVAD, TurnConfig
+from senjin.candidate import JOB_DESCRIPTION, RESUME, add_candidate_arg, candidate_from_args
 from senjin.config import InterviewConfig, exit_on_config_error
 from senjin.interview.exemplars import ExemplarIndex
 from senjin.interview.session import InterviewSession
 from senjin.interview.transcript import TranscriptLog
 from senjin.llm.client import DEFAULT_MODEL, OllamaClient
 from senjin.llm.tools import FilteredTools, open_mcp_tools
+from senjin.mcp_server.store import bank_label
+from senjin.plan import PLAN, plan_from_args
 
 # record_note costs a full LLM round trip before the interviewer can speak; skip it live.
 VOICE_HIDDEN = {"record_note"}
@@ -25,7 +27,11 @@ VOICE_HIDDEN = {"record_note"}
 
 def voice_config(args) -> InterviewConfig:
     """Environment limits (SENJIN_*), overridden by any flags that were given."""
-    return InterviewConfig.from_env().override(
+    base = InterviewConfig.from_env()
+    plan = getattr(args, "plan", None)  # set for commands that run an interview
+    if plan is not None:
+        base = plan.apply(base)
+    return base.override(
         getattr(args, "max_questions", None),
         getattr(args, "max_minutes", None),
         getattr(args, "idle_seconds", None),
@@ -82,13 +88,15 @@ async def run(args) -> None:
     await stt.start()
     player = Player(tts.sample_rate)
     async with AsyncExitStack() as stack:
-        env = {**os.environ, "SENJIN_NOTES_PATH": str(out.with_suffix(".notes.jsonl"))}
-        if args.candidate_dir:
-            env["SENJIN_CANDIDATE_DIR"] = str(args.candidate_dir)
+        notes_path = out.with_suffix(".notes.jsonl")
         tools = FilteredTools(
-            await stack.enter_async_context(open_mcp_tools(env=env)), VOICE_HIDDEN
+            await stack.enter_async_context(
+                open_mcp_tools(args.candidate_dir, notes_path=notes_path)
+            ),
+            VOICE_HIDDEN,
         )
         print(cfg.describe())
+        print(bank_label(args.candidate_dir))
         session = InterviewSession(
             OllamaClient(model=args.model),
             TranscriptLog(out),
@@ -162,7 +170,9 @@ async def simulate(args) -> None:
     await stt.start()
     clips = [to_16k(await tts.synth(t), tts.sample_rate) for t in SIM_ANSWERS[: args.turns]]
     async with AsyncExitStack() as stack:
-        tools = FilteredTools(await stack.enter_async_context(open_mcp_tools()), VOICE_HIDDEN)
+        tools = FilteredTools(
+            await stack.enter_async_context(open_mcp_tools(args.candidate_dir)), VOICE_HIDDEN
+        )
         print(cfg.describe())
         session = InterviewSession(
             OllamaClient(model=args.model),
@@ -226,9 +236,7 @@ def main() -> None:
     run_p = sub.choices["run"]
     run_p.add_argument("--model", default=DEFAULT_MODEL)
     run_p.add_argument("--exemplars", type=Path)
-    run_p.add_argument(
-        "--candidate-dir", type=Path, help="folder with resume.md and job_description.md"
-    )
+    add_candidate_arg(run_p)
     run_p.add_argument(
         "--no-barge-in", action="store_true", help="use with speakers, not headphones"
     )
@@ -250,6 +258,7 @@ def main() -> None:
     run_p.add_argument("--out", type=Path)
     sim_p = sub.choices["simulate"]
     sim_p.add_argument("--model", default=DEFAULT_MODEL)
+    add_candidate_arg(sim_p)
     sim_p.add_argument("--turns", type=int, default=6, help="candidate answers to play (max 6)")
     sim_p.add_argument("--silence-ms", type=int)
     sim_p.add_argument("--filler-ms", type=int)
@@ -269,10 +278,13 @@ def main() -> None:
         print(sd.query_devices())
     elif args.cmd == "check":
         asyncio.run(check(args))
-    elif args.cmd == "run":
-        asyncio.run(run(args))
-    elif args.cmd == "simulate":
-        asyncio.run(simulate(args))
+    elif args.cmd in ("run", "simulate"):
+        args.candidate_dir = candidate_from_args(
+            args.candidate_dir, files=(RESUME, JOB_DESCRIPTION), questions=True
+        )
+        args.plan = plan_from_args(args.candidate_dir)
+        print(args.plan.describe(args.candidate_dir / PLAN))
+        asyncio.run(run(args) if args.cmd == "run" else simulate(args))
     else:
         report(args.path)
 

@@ -1,7 +1,6 @@
 """Run a full spoken interview inside a Google Meet."""
 
 import asyncio
-import os
 import time
 from contextlib import AsyncExitStack
 from pathlib import Path
@@ -19,6 +18,7 @@ from senjin.interview.session import InterviewSession
 from senjin.interview.transcript import TranscriptLog
 from senjin.llm.client import OllamaClient
 from senjin.llm.tools import FilteredTools, open_mcp_tools
+from senjin.mcp_server.store import bank_label
 from senjin.meet.audio import find_bridge
 from senjin.meet.joiner import MeetBot
 from senjin.meet.supervisor import watch_call
@@ -39,11 +39,12 @@ async def run_meet_interview(
     config: InterviewConfig | None = None,
     guest_name: str = "Senjin (AI interviewer)",
     exemplars: Path | None = None,
-    candidate_dir: Path | None = None,
+    candidate_dir: Path,
     log=print,
 ) -> Path:
     cfg = config or InterviewConfig.from_env()
     log(cfg.describe())
+    log(bank_label(candidate_dir))
     bridge = find_bridge(speak=speak, hear=hear)  # fail fast, before opening a browser
     ensure_models()
     tts = PiperTTS()
@@ -56,11 +57,12 @@ async def run_meet_interview(
         try:
             # Everything slow happens before the bot joins: the model loads and reads the long
             # prompt now, so the first thing the candidate hears is not delayed.
-            env = {**os.environ, "SENJIN_NOTES_PATH": str(out.with_suffix(".notes.jsonl"))}
-            if candidate_dir:
-                env["SENJIN_CANDIDATE_DIR"] = str(candidate_dir)
+            notes_path = out.with_suffix(".notes.jsonl")
             tools = FilteredTools(
-                await stack.enter_async_context(open_mcp_tools(env=env)), {"record_note"}
+                await stack.enter_async_context(
+                    open_mcp_tools(candidate_dir, notes_path=notes_path)
+                ),
+                {"record_note"},
             )
             session = InterviewSession(
                 OllamaClient(model=model),

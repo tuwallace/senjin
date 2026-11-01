@@ -455,3 +455,43 @@ async def test_candidate_who_still_asks_is_answered(said):
         await collect(session.respond(text))
     await collect(session.respond(said))
     assert session.state.phase == Phase.CANDIDATE_QA
+
+
+@pytest.mark.parametrize(
+    "said",
+    [
+        "Thank you for the detailed response. I have no more questions and appreciate the "
+        "opportunity to learn more about the role and team. Have a great day!",
+        "That was really helpful, thank you so much for your time today. I don't have any more "
+        "questions, and I look forward to hearing from the team.",
+        "No, that's everything for me. Thanks for walking me through all of it, it was a pleasure.",
+    ],
+)
+async def test_a_long_polite_sign_off_ends_the_candidate_qa(said):
+    llm = FakeLLM([])
+    session = orchestrated(llm, candidate_qa=3)
+    await collect(session.open())
+    for text in ["ready", "project", "answer"]:
+        await collect(session.respond(text))
+    assert session.state.phase == Phase.CANDIDATE_QA
+    await collect(session.respond(said))
+    assert session.state.phase == Phase.SIGNOFF
+
+
+@pytest.mark.parametrize(
+    "said",
+    [
+        "Thank you. I have one question: how does the team approach deployment? "
+        "I have no more questions after that.",
+        "I have no more questions about pay, but it would help to know how big the team is.",
+        "Thanks, that is helpful. Also, I wonder about the on-call rotation and how often it is.",
+    ],
+)
+async def test_a_candidate_who_still_asks_something_is_not_cut_off(said):
+    llm = FakeLLM([])
+    session = orchestrated(llm, candidate_qa=3)
+    await collect(session.open())
+    for text in ["ready", "project", "answer"]:
+        await collect(session.respond(text))
+    await collect(session.respond(said))
+    assert session.state.phase == Phase.CANDIDATE_QA

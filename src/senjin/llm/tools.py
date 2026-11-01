@@ -3,6 +3,7 @@
 import sys
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
+from pathlib import Path
 from typing import Any, Protocol
 
 from mcp import ClientSession, StdioServerParameters
@@ -30,13 +31,22 @@ class McpToolRunner:
 
 @asynccontextmanager
 async def open_mcp_tools(
+    candidate_dir: Path,
+    *,
+    bank_dir: Path | None = None,
+    notes_path: Path | None = None,
     command: str = sys.executable,
-    args: list[str] | None = None,
-    env: dict[str, str] | None = None,
 ) -> AsyncIterator[McpToolRunner]:
-    params = StdioServerParameters(
-        command=command, args=args or ["-m", "senjin.mcp_server.server"], env=env
-    )
+    """Start the interview server for one candidate folder.
+
+    The questions come from <candidate_dir>/questions.yaml, or from every file in `bank_dir`.
+    """
+    args = ["-m", "senjin.mcp_server.server", "--candidate-dir", str(candidate_dir)]
+    if bank_dir is not None:
+        args += ["--bank-dir", str(bank_dir)]
+    if notes_path is not None:
+        args += ["--notes-path", str(notes_path)]
+    params = StdioServerParameters(command=command, args=args)
     async with AsyncExitStack() as stack:
         read, write = await stack.enter_async_context(stdio_client(params))
         session = await stack.enter_async_context(ClientSession(read, write))

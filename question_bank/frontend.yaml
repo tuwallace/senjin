@@ -1,0 +1,48 @@
+- id: fe-css-architecture
+  topic: frontend
+  difficulty: medium
+  skills: ["css", "tailwind", "css modules", "styling", "design system", "frontend"]
+  prompt: You are starting a new application and have to choose between Tailwind, CSS Modules and a prebuilt component library for styling. How would you decide, and how would you keep styles consistent as the team grows?
+  follow_ups:
+    - How would you handle theming and a dark mode?
+    - What would you do about unused styles and bundle size?
+  rubric:
+    - Names real trade-offs between utility classes, scoped modules and prebuilt libraries
+    - Plans design tokens, theming and consistency across teams
+    - Considers specificity, bundle size and long-term maintenance
+- id: fe-component-library
+  topic: frontend
+  difficulty: medium
+  skills: ["component", "component driven", "design system", "react", "storybook", "frontend"]
+  prompt: Your team is building a shared set of React components used by several applications. How would you design, document and version them?
+  follow_ups:
+    - How do you decide what belongs in the shared library and what stays in an app?
+    - How would you roll out a breaking change?
+  rubric:
+    - Defines a clear component API with composition, and separates presentation from app logic
+    - Documents and tests components in isolation, for example with Storybook and visual tests
+    - Versions with semantic versioning, deprecation paths and migration help
+- id: fe-typescript
+  topic: frontend
+  difficulty: medium
+  skills: ["typescript", "types", "javascript", "frontend"]
+  prompt: How do you use TypeScript to prevent real bugs in a React and Node.js application, beyond adding types to variables?
+  follow_ups:
+    - How do you keep types in sync between the API and the client?
+    - When would you avoid clever types?
+  rubric:
+    - Uses strict mode, discriminated unions and narrowing to encode real invariants
+    - Generates or shares types from one source such as schemas, OpenAPI or GraphQL codegen
+    - Validates data at runtime boundaries and balances type complexity against readability
+- id: fe-checkout-tests
+  topic: testing
+  difficulty: medium
+  skills: ["testing", "jest", "react testing library", "playwright", "cypress", "tdd", "bdd", "e2e", "frontend"]
+  prompt: A critical checkout flow keeps breaking in production. What mix of Jest, React Testing Library and Playwright or Cypress tests would you add, and why?
+  follow_ups:
+    - How would you keep the browser tests fast and stable?
+    - What would you deliberately not test?
+  rubric:
+    - Puts most tests low in the pyramid with a few end to end tests on the critical path
+    - Tests behaviour the user sees, using stable selectors and controlled test data
+    - Handles flakiness with waiting on conditions, isolation and retries used sparingly

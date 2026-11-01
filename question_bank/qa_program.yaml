@@ -1,0 +1,230 @@
+- id: qa-test-strategy
+  topic: test_strategy
+  difficulty: medium
+  skills: ["test strategy", "test plan", "qa", "testing", "risk-based testing", "quality assurance", "sdlc", "stlc"]
+  prompt: "You join a team that is about to build a new web application and has no test plan. How would you write a test strategy for it?"
+  follow_ups:
+    - "What would you leave out of the plan, and why?"
+    - "How would the plan change for a system that handles sensitive records?"
+  rubric:
+    - "Starts from risk, scope and requirements, not from a list of tools"
+    - "Separates test levels (unit, integration, system, acceptance) and says who owns each"
+    - "States entry and exit criteria, environments and test data"
+- id: qa-traceability
+  topic: traceability
+  difficulty: medium
+  skills: ["traceability", "traceability matrix", "zephyr", "jira", "requirements", "test coverage", "test cases", "qa"]
+  prompt: "How do you show that every requirement has test coverage, and keep that evidence correct as requirements change?"
+  follow_ups:
+    - "How do you handle a requirement that cannot be tested directly?"
+    - "What do you do when a requirement changes in the middle of a sprint?"
+  rubric:
+    - "Links requirements to test cases to executions to defects in a tool such as Jira with Zephyr, not a spreadsheet kept by hand"
+    - "Reviews the matrix for gaps in both directions: untested requirements and tests with no requirement"
+    - "Keeps it current by tying changes to a review step, and can say what an auditor would see"
+- id: qa-test-design
+  topic: test_design
+  difficulty: easy
+  skills: ["test design", "test cases", "boundary value", "equivalence partitioning", "testing", "qa", "manual testing"]
+  prompt: "You are given a form with an age field that accepts 18 to 65. How do you decide which tests to write for it?"
+  follow_ups:
+    - "What would you test beyond the field itself?"
+    - "How would you write the cases so another tester can run them the same way?"
+  rubric:
+    - "Uses equivalence classes and boundary values (17, 18, 65, 66) and invalid input such as letters or empty"
+    - "Considers validation messages, accessibility and what is stored or sent after submit"
+    - "Writes clear steps with expected results and preconditions"
+- id: qa-automation-choice
+  topic: test_automation
+  difficulty: medium
+  skills: ["test automation", "selenium", "playwright", "cypress", "regression testing", "testing", "qa", "automation"]
+  prompt: "How do you decide which tests to automate and which to keep manual?"
+  follow_ups:
+    - "How do you show that an automation investment paid off?"
+    - "When would you stop maintaining an automated suite?"
+  rubric:
+    - "Automates stable, repeated, high-value checks such as regression and smoke tests; keeps exploratory and one-off checks manual"
+    - "Weighs build and maintenance cost against how often a test runs and how much risk it covers"
+    - "Names a measure such as time saved, escaped defects or release frequency"
+- id: qa-test-pyramid
+  topic: test_automation
+  difficulty: medium
+  skills: ["test pyramid", "unit testing", "integration testing", "end-to-end testing", "testing", "qa", "playwright", "selenium"]
+  prompt: "Explain how you balance unit, API and end-to-end tests in a web application, and what goes wrong when the balance is off."
+  follow_ups:
+    - "What would you do with a suite that is mostly slow browser tests?"
+  rubric:
+    - "Describes many fast low-level tests and fewer broad browser tests"
+    - "Names the cost of too many end-to-end tests: slow feedback, flakiness, hard diagnosis"
+    - "Moves checks down to the lowest level that can catch the failure"
+- id: qa-flaky-tests
+  topic: test_automation
+  difficulty: medium
+  skills: ["flaky tests", "test automation", "selenium", "playwright", "ci", "continuous integration", "testing", "qa", "debugging"]
+  prompt: "A browser test passes on one run and fails on the next, with no code change. How do you find the cause and fix it?"
+  follow_ups:
+    - "How do you keep flaky tests from making the team ignore failures?"
+  rubric:
+    - "Looks for timing and waiting problems, shared or dirty test data, order dependence and environment differences"
+    - "Reproduces it with logs, traces or screenshots before changing anything, and avoids blind retries or fixed sleeps"
+    - "Tracks flake rate and quarantines or fixes repeat offenders"
+- id: qa-api-testing
+  topic: api_testing
+  difficulty: medium
+  skills: ["api testing", "postman", "rest", "http", "testing", "qa", "authorization", "schema validation"]
+  prompt: "How would you test a REST API that the web front end depends on, before the front end is finished?"
+  follow_ups:
+    - "How would you test that one user cannot read another user's data?"
+    - "How do you keep these tests in a pipeline?"
+  rubric:
+    - "Covers status codes, response schema, error cases, input validation and authentication"
+    - "Checks authorization and data isolation, not only the happy path"
+    - "Uses a tool such as Postman, creates its own test data and runs in CI"
+- id: qa-defect-triage
+  topic: defect_management
+  difficulty: medium
+  skills: ["defect management", "defect triage", "bug tracking", "jira", "severity", "priority", "qa", "testing"]
+  prompt: "Describe how you run defect triage. A tester reports a bug, so what happens from there to a decision?"
+  follow_ups:
+    - "How do you tell severity from priority? Give an example where they differ."
+    - "What makes a bug report good enough to act on?"
+  rubric:
+    - "Reproduces and confirms the defect, then sets severity (impact) and priority (urgency) separately"
+    - "Brings the right people in (product, development) and records a decision and owner in the tracker"
+    - "A good report has steps, expected and actual result, environment, evidence and a clear title"
+- id: qa-release-pressure
+  topic: defect_management
+  difficulty: hard
+  skills: ["release management", "risk management", "defect management", "go/no-go", "qa", "testing", "stakeholder communication"]
+  prompt: "The day before a release you find a serious defect, and the business wants to ship anyway. What do you do?"
+  follow_ups:
+    - "What would you put in writing, and to whom?"
+  rubric:
+    - "States the impact and the risk plainly with evidence, and offers options such as a fix, a workaround, a limited release or a delay"
+    - "Lets the accountable owner make the call, and records the decision and accepted risk"
+    - "Plans monitoring and a rollback for what ships"
+- id: qa-regression-risk
+  topic: regression_testing
+  difficulty: medium
+  skills: ["regression testing", "risk-based testing", "test prioritization", "testing", "qa", "release management"]
+  prompt: "A release is due and there is only time to run about a third of your regression suite. How do you choose what to run?"
+  follow_ups:
+    - "How do you make sure that choice is not forgotten next time?"
+  rubric:
+    - "Ranks by impact and likelihood: critical user paths, areas that changed, areas with a history of defects"
+    - "Uses change information and past defect data rather than guessing"
+    - "Documents what was skipped and the risk accepted, and shares it with stakeholders"
+- id: qa-agile-testing
+  topic: agile_delivery
+  difficulty: medium
+  skills: ["agile", "scrum", "sprint planning", "backlog", "user stories", "acceptance criteria", "jira", "qa", "kanban"]
+  prompt: "How does testing fit into a two-week Scrum sprint? Walk me through what QA does from planning to the review."
+  follow_ups:
+    - "What do you do when development finishes stories on the last day of the sprint?"
+    - "How do you write acceptance criteria that testers can use?"
+  rubric:
+    - "Takes part in refinement and planning, and shapes acceptance criteria before work starts (shift left)"
+    - "Tests continuously during the sprint rather than in a block at the end"
+    - "Defines done to include testing and handles late stories with the team, such as smaller stories or work limits"
+- id: qa-jira-workflow
+  topic: tooling
+  difficulty: easy
+  skills: ["jira", "confluence", "zephyr", "workflow design", "issue tracking", "boards", "qa", "agile"]
+  prompt: "How would you set up Jira, Confluence and a test management add-on such as Zephyr so a team can plan, run and report on testing?"
+  follow_ups:
+    - "What would you do to keep the setup from becoming too heavy for the team?"
+  rubric:
+    - "Defines issue types, a simple workflow, test cycles and links between stories, tests and bugs"
+    - "Uses dashboards or filters for progress and keeps shared documents in Confluence"
+    - "Limits fields and approval steps to what the team actually uses"
+- id: qa-metrics
+  topic: metrics
+  difficulty: medium
+  skills: ["metrics", "defect metrics", "dashboards", "defect escape rate", "test coverage", "reporting", "qa", "power bi", "kpi"]
+  prompt: "Which measures would you put on a quality dashboard for executives, and which would you refuse to use?"
+  follow_ups:
+    - "What does code coverage fail to tell you?"
+  rubric:
+    - "Picks measures tied to outcomes, such as defect escape rate, defect age and closure, test execution progress and time to detect"
+    - "Warns about measures that can be gamed, such as raw test case counts or bugs per tester"
+    - "Explains how each measure leads to a decision, and shows trend rather than a single number"
+- id: qa-iso-9001
+  topic: quality_management
+  difficulty: medium
+  skills: ["iso 9001", "quality management", "qms", "audit", "continuous improvement", "corrective action", "sop", "compliance", "quality assurance"]
+  prompt: "How would you apply ISO 9001 ideas to a software delivery team without burying it in paperwork?"
+  follow_ups:
+    - "What records would an auditor expect to see, and who keeps them?"
+    - "How do you deal with a nonconformity found in an audit?"
+  rubric:
+    - "Defines processes, owners and measurable quality objectives, and keeps only records that serve them"
+    - "Runs internal audits and management review, and links findings to corrective action"
+    - "Describes a corrective action as root cause, fix, check that it worked, and recorded"
+- id: qa-lean-six-sigma
+  topic: quality_management
+  difficulty: medium
+  skills: ["lean six sigma", "dmaic", "process improvement", "root cause analysis", "defect reduction", "metrics", "quality assurance"]
+  prompt: "Pick a recurring problem in a delivery process, such as bugs reaching production, and walk me through how you would use DMAIC on it."
+  follow_ups:
+    - "How do you find the root cause rather than the loudest complaint?"
+  rubric:
+    - "Walks through Define, Measure, Analyze, Improve and Control in order, with a baseline measurement"
+    - "Uses a method for root cause such as five whys, a fishbone diagram or Pareto analysis"
+    - "Sets controls so the gain lasts, such as a check, a metric or a changed procedure"
+- id: qa-compliance-validation
+  topic: compliance
+  difficulty: hard
+  skills: ["compliance", "nist", "fisma", "section 508", "wcag", "ferpa", "audit", "validation", "security controls", "accessibility"]
+  prompt: "How would you check that a system meets federal requirements such as NIST 800-53, Section 508 and, for student data, FERPA, before it goes live?"
+  follow_ups:
+    - "Which of those checks can be automated, and which need a person?"
+    - "How do you show the results to an auditor?"
+  rubric:
+    - "Maps each requirement to a control or test and to a piece of evidence"
+    - "Combines automated checks (scanners, accessibility tools) with manual review and assistive technology testing"
+    - "Keeps dated, traceable evidence and tracks gaps to closure"
+- id: qa-uat
+  topic: acceptance_testing
+  difficulty: easy
+  skills: ["uat", "user acceptance testing", "acceptance criteria", "stakeholder communication", "test planning", "qa", "release management"]
+  prompt: "How do you plan and run user acceptance testing with people who are not testers?"
+  follow_ups:
+    - "What do you do when users disagree about whether something is a defect?"
+  rubric:
+    - "Agrees scope and acceptance criteria early, prepares scripts, data and a test environment, and trains the testers"
+    - "Collects feedback in one place and separates defects from change requests"
+    - "Gets a recorded sign-off with open issues listed"
+- id: qa-sop-documentation
+  topic: documentation
+  difficulty: easy
+  skills: ["documentation", "sop", "standard operating procedures", "confluence", "runbook", "release notes", "technical writing", "knowledge base"]
+  prompt: "You must write a standard operating procedure for a task the team does every release. How do you write it so people actually follow it and keep it current?"
+  follow_ups:
+    - "How do you check that the procedure works for someone who has never done the task?"
+  rubric:
+    - "Keeps it short, in numbered steps, with an owner, a purpose, inputs and expected results"
+    - "Tests it with a new person and fixes the gaps found"
+    - "Stores it where the team works, versions it and sets a review date"
+- id: qa-program-risk
+  topic: program_leadership
+  difficulty: hard
+  skills: ["program management", "project management", "risk management", "stakeholder communication", "cross-functional", "sdlc", "planning", "leadership"]
+  prompt: "You lead a program with engineering, QA, operations and a government customer. A key milestone is slipping. How do you find out what is going on and what do you do about it?"
+  follow_ups:
+    - "How do you report this to the customer?"
+    - "What would you change in the plan so it does not happen again?"
+  rubric:
+    - "Gathers facts from each team and finds the critical path and the real cause rather than assuming"
+    - "Offers options (scope, schedule, resources) with their costs, and escalates with a recommendation"
+    - "Reports plainly and early, and adds a risk register item and a lesson to the plan"
+- id: qa-cross-team
+  topic: program_leadership
+  difficulty: medium
+  skills: ["cross-functional", "collaboration", "stakeholder communication", "conflict resolution", "agile", "leadership", "program management"]
+  prompt: "Tell me about a time development and QA disagreed about whether a release was ready. How was it resolved, and what would you do differently now?"
+  follow_ups:
+    - "How did you keep the working relationship intact?"
+  rubric:
+    - "Gives a specific example with the facts, the positions of each side and the outcome"
+    - "Moves the discussion from opinions to evidence and agreed criteria"
+    - "Reflects honestly on what they learned"

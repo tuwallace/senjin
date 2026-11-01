@@ -2,7 +2,6 @@
 
 import argparse
 import asyncio
-import os
 from pathlib import Path
 
 from senjin.assess.judge import (
@@ -14,8 +13,9 @@ from senjin.assess.judge import (
     to_markdown,
 )
 from senjin.assess.redact import names_from_dir
+from senjin.candidate import add_candidate_arg, candidate_from_args
 from senjin.config import load_env_file
-from senjin.mcp_server.store import load_questions
+from senjin.mcp_server.store import all_questions
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -25,15 +25,16 @@ async def run(
     judge_model: str,
     out_dir: Path,
     bank: Path,
+    candidate_dir: Path,
     names: list[str] | None = None,
     redact: bool = True,
 ) -> Path:
     load_env_file()
     rows = load_rows(path)
     ids = asked_question_ids(rows)
-    rubrics = {q.id: q.rubric for q in load_questions(bank) if q.id in ids}
+    # the shared bank plus any questions senjin-review generated for this candidate
+    rubrics = {q.id: q.rubric for q in all_questions(bank, candidate_dir) if q.id in ids}
     if names is None:
-        candidate_dir = Path(os.environ.get("SENJIN_CANDIDATE_DIR", ROOT / "examples/candidate"))
         names = names_from_dir(candidate_dir)
     report = await assess(rows, OllamaJudge(judge_model), rubrics, names, redact)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -61,6 +62,7 @@ def main() -> None:
     parser.add_argument("--judge", default=DEFAULT_JUDGE)
     parser.add_argument("--out-dir", type=Path, default=Path("data/reports"))
     parser.add_argument("--question-bank", type=Path, default=ROOT / "question_bank")
+    add_candidate_arg(parser)
     parser.add_argument(
         "--candidate-name", action="append", help="name to mask (default: from the resume)"
     )
@@ -68,12 +70,14 @@ def main() -> None:
         "--no-redact", action="store_true", help="show the judge names and personal details"
     )
     args = parser.parse_args()
+    candidate_dir = candidate_from_args(args.candidate_dir)
     asyncio.run(
         run(
             args.transcript,
             args.judge,
             args.out_dir,
             args.question_bank,
+            candidate_dir,
             args.candidate_name,
             not args.no_redact,
         )

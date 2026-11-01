@@ -1,0 +1,60 @@
+- id: cs-cloud-native
+  topic: architecture
+  difficulty: hard
+  skills: ["cloud native", "serverless", "microservices", "aws", "lambda", "architecture", "cloud infrastructure"]
+  prompt: A team wants to move a monolithic Node.js application to serverless functions and microservices on AWS. When is that a good idea, and when is it not?
+  follow_ups:
+    - What new failure modes does it introduce?
+    - How would you migrate without a big-bang rewrite?
+  rubric:
+    - Weighs scaling, cost, team autonomy and operational overhead against a well-structured monolith
+    - Names distributed-system costs such as latency, cold starts, debugging and data consistency
+    - Proposes incremental migration, for example carving out one service at a time
+- id: cs-govcloud
+  topic: cloud
+  difficulty: medium
+  skills: ["govcloud", "aws", "azure", "cloud", "cloud infrastructure", "compliance", "government cloud", "deployment"]
+  prompt: You must deploy a web application into a government cloud region such as AWS GovCloud. What changes about how you design, deploy and operate it compared with a commercial region?
+  follow_ups:
+    - Which managed services might not be available there?
+    - How does it change who can touch production?
+  rubric:
+    - Knows the region is isolated, with different endpoints, accounts and a restricted service list
+    - Plans for compliance boundaries, personnel restrictions and approved tooling
+    - Adapts pipelines and infrastructure as code rather than copying commercial setups
+- id: cs-nist-controls
+  topic: security
+  difficulty: hard
+  skills: ["nist", "fedramp", "compliance", "security controls", "audit", "devsecops", "security"]
+  prompt: How would you build evidence for NIST 800-53 or FedRAMP controls into a delivery pipeline instead of collecting it by hand before an audit?
+  follow_ups:
+    - Which controls are easiest to automate and which are not?
+    - How do you keep that evidence trustworthy?
+  rubric:
+    - Maps controls to automated checks such as scanning, policy as code and configuration baselines
+    - Stores signed, versioned evidence and ties it to each release
+    - Accepts that some controls stay procedural and plans for them
+- id: cs-secrets-iam
+  topic: security
+  difficulty: medium
+  skills: ["secrets", "iam", "least privilege", "security", "kubernetes", "docker", "containers", "cloud", "devsecops"]
+  prompt: Where do you keep database passwords and API keys for an application running in containers, and how do you limit what each service can reach?
+  follow_ups:
+    - How do you rotate a secret without downtime?
+    - What happens if a container is compromised?
+  rubric:
+    - Uses a secrets manager or sealed secrets, never images or source control
+    - Applies least-privilege roles per service with short-lived credentials
+    - Limits the blast radius with network policies and plans rotation and detection
+- id: cs-observability
+  topic: operations
+  difficulty: medium
+  skills: ["observability", "monitoring", "logging", "alerting", "devops", "incident response", "sre", "reliability"]
+  prompt: After a release, error rates climb but no alert fires. How would you set up logging, metrics and alerting so that does not happen again?
+  follow_ups:
+    - How do you avoid alert fatigue?
+    - What would you check first during the incident?
+  rubric:
+    - Uses the three signals of logs, metrics and traces with useful context
+    - Alerts on user-facing symptoms and service level objectives rather than every cause
+    - Closes the loop with runbooks, a post-incident review and tests of the alerts

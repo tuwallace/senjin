@@ -12,6 +12,7 @@ from senjin.interview.prompts import SYSTEM_PROMPT, phase_message
 from senjin.interview.state import Phase
 from senjin.llm.client import OllamaClient, ToolCall
 from senjin.llm.tools import open_mcp_tools
+from senjin.mcp_server.store import ROOT
 
 # (phase, history, acceptable first actions: tool names, or None for "speak, no tool")
 SCENARIOS = [
@@ -58,7 +59,9 @@ async def run_model(model: str, tools: list[dict]) -> None:
 
 
 async def main(models: list[str]) -> None:
-    async with open_mcp_tools() as runner:
+    async with open_mcp_tools(
+        ROOT / "examples/candidate", bank_dir=ROOT / "question_bank"
+    ) as runner:
         for model in models:
             await run_model(model, runner.tools)
 

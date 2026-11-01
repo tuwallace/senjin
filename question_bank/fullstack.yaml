@@ -1,6 +1,7 @@
 - id: fs-ssr-ssg-isr
   topic: web_rendering
   difficulty: medium
+  skills: ["nextjs", "ssr", "ssg", "isr", "rendering", "seo", "caching"]
   prompt: A public government portal has some pages that rarely change and some that show live data. How would you decide between static generation, server rendering and client rendering in Next.js?
   follow_ups:
     - How would you keep a statically generated page fresh when its content changes?
@@ -12,6 +13,7 @@
 - id: fs-app-router
   topic: web_rendering
   difficulty: medium
+  skills: ["nextjs", "app router", "server components", "react", "ssr", "rendering"]
   prompt: How do React Server Components in the Next.js App Router change where you put data fetching and state compared with the Pages Router?
   follow_ups:
     - When does a component need to be a client component?
@@ -23,6 +25,7 @@
 - id: fs-auth
   topic: security
   difficulty: hard
+  skills: ["authentication", "authorization", "oauth", "saml", "oidc", "identity provider", "okta", "login.gov", "active directory", "rbac", "session", "security", "cac", "piv"]
   prompt: Design sign-in for a web application where users log in with an identity provider such as Okta or Login.gov. What would the flow look like end to end?
   follow_ups:
     - Where would you store the session, and how would you protect it?
@@ -34,6 +37,7 @@
 - id: fs-accessibility
   topic: accessibility
   difficulty: easy
+  skills: ["accessibility", "wcag", "508", "a11y", "aria", "screen reader"]
   prompt: A public-facing form must meet Section 508 and WCAG 2.1 AA. What do you build in and how do you check it?
   follow_ups:
     - How would you test accessibility automatically and by hand?
@@ -45,6 +49,7 @@
 - id: fs-api-design
   topic: api_design
   difficulty: medium
+  skills: ["api integration", "api", "rest", "graphql", "pagination", "api design", "validation"]
   prompt: You are building the API behind a React front end that lists, filters and edits records. Would you use REST or GraphQL, and how would you design it?
   follow_ups:
     - How would you handle pagination and large result sets?
@@ -56,6 +61,7 @@
 - id: fs-state-management
   topic: frontend
   difficulty: medium
+  skills: ["react", "state management", "redux", "zustand", "context", "frontend"]
   prompt: A React application's state has grown messy, with data fetched in many places. How would you organize server data and UI state?
   follow_ups:
     - When would you reach for Redux or Zustand instead of context?
@@ -67,6 +73,7 @@
 - id: fs-testing
   topic: testing
   difficulty: easy
+  skills: ["testing", "jest", "react testing library", "cypress", "playwright", "tdd", "bdd", "unit tests", "e2e"]
   prompt: How do you decide what to test in a Next.js application, and with which tools?
   follow_ups:
     - What would you cover with end-to-end tests and what with unit tests?
@@ -78,17 +85,19 @@
 - id: fs-cicd-containers
   topic: devops
   difficulty: medium
+  skills: ["cicd", "docker", "kubernetes", "containers", "devops", "devsecops", "deployment", "pipeline", "rollback"]
   prompt: Walk me through how a change to a Next.js and Node.js application gets from a pull request to production in a regulated environment.
   follow_ups:
     - How would you containerize it and keep the image small and safe?
     - How would you roll back a bad release?
   rubric:
-    - CI stages: lint, tests, build, dependency and container scanning, approvals
+    - "CI stages: lint, tests, build, dependency and container scanning, approvals"
     - Multi-stage Docker builds, non-root users, pinned base images, secrets outside the image
     - Safe deployment strategies (blue/green or canary) and a rollback plan
 - id: fs-performance
   topic: frontend
   difficulty: medium
+  skills: ["performance", "web vitals", "lcp", "frontend", "caching", "code splitting"]
   prompt: Users say a data-heavy page in your application feels slow. How would you find out why and fix it?
   follow_ups:
     - Which Core Web Vitals would you look at?
@@ -100,6 +109,7 @@
 - id: fs-leadership
   topic: engineering_practice
   difficulty: easy
+  skills: ["leadership", "mentoring", "code review", "standards", "documentation", "technical leadership"]
   prompt: You are the senior engineer on a team with several mid-level developers. How do you run code reviews and set coding standards?
   follow_ups:
     - How do you handle a review disagreement?

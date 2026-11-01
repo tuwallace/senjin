@@ -2,7 +2,11 @@
   "mcpServers": {
     "senjin": {
       "command": "uv",
-      "args": ["run", "python", "-m", "senjin.mcp_server.server"]
+      "args": [
+        "run", "python", "-m", "senjin.mcp_server.server",
+        "--candidate-dir", "examples/candidate",
+        "--bank-dir", "question_bank"
+      ]
     }
   }
 }

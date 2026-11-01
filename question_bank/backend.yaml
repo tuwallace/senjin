@@ -1,6 +1,7 @@
 - id: be-rate-limiter
   topic: system_design
   difficulty: medium
+  skills: ["rate limiting", "distributed systems", "redis", "api", "system design", "scalability"]
   prompt: Imagine you are building a rate limiter for a public API that serves many customers. How would you design it?
   follow_ups:
     - How would this work across multiple servers?
@@ -13,6 +14,7 @@
 - id: be-url-shortener
   topic: system_design
   difficulty: easy
+  skills: ["system design", "scalability", "database", "caching"]
   prompt: Suppose you were asked to build a URL shortening service. What would the main components be?
   follow_ups:
     - How do you generate the short codes without collisions?
@@ -24,6 +26,7 @@
 - id: be-event-pipeline
   topic: system_design
   difficulty: hard
+  skills: ["streaming", "kafka", "data pipeline", "ingestion", "scalability"]
   prompt: Say you need to ingest ten thousand events per second and make them queryable within a minute. How would you design that pipeline?
   follow_ups:
     - How do you handle duplicates and late events?
@@ -35,6 +38,7 @@
 - id: al-dedupe-stream
   topic: algorithms
   difficulty: easy
+  skills: ["algorithms", "data structures", "hashing"]
   prompt: You are reading a long stream of integers. How would you find the first value that appears twice?
   follow_ups:
     - What is the memory cost?
@@ -46,6 +50,7 @@
 - id: al-lru-cache
   topic: algorithms
   difficulty: medium
+  skills: ["algorithms", "data structures", "caching"]
   prompt: How would you implement an LRU cache with constant-time get and put?
   follow_ups:
     - How does it change if it must be thread-safe?
@@ -57,6 +62,7 @@
 - id: al-merge-intervals
   topic: algorithms
   difficulty: medium
+  skills: ["algorithms", "sorting"]
   prompt: You are given a list of meeting time intervals. How would you work out the minimum number of rooms needed?
   follow_ups:
     - What is the complexity of your approach?
@@ -68,6 +74,7 @@
 - id: db-slow-query
   topic: databases
   difficulty: medium
+  skills: ["database", "sql", "postgres", "mysql", "performance", "indexing", "query optimization"]
   prompt: A production query that used to take fifty milliseconds now takes ten seconds. How would you investigate?
   follow_ups:
     - What would make an index not get used?
@@ -79,6 +86,7 @@
 - id: db-consistency
   topic: databases
   difficulty: hard
+  skills: ["database", "transactions", "saga", "distributed systems", "microservices", "consistency"]
   prompt: Two services must each update their own database as part of one business action. How would you keep them consistent?
   follow_ups:
     - What are the failure cases of your approach?
@@ -90,6 +98,7 @@
 - id: eng-incident
   topic: engineering_practice
   difficulty: easy
+  skills: ["incident response", "operations", "oncall", "devops", "reliability", "monitoring"]
   prompt: Think about a production incident you have handled. How do you approach one, starting from the first alert?
   follow_ups:
     - How do you communicate during it?

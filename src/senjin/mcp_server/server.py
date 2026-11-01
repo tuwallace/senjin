@@ -1,28 +1,20 @@
 """MCP server exposing interview context. One process per interview (stdio).
 
-Env: SENJIN_CANDIDATE_DIR, SENJIN_QUESTION_BANK, SENJIN_QUESTION_SET, SENJIN_NOTES_PATH.
-Debug with: ollmcp -s src/senjin/mcp_server/server.py -m qwen3:8b-16k
+Args: --candidate-dir DIR (required), --bank-dir DIR (ask from every file in DIR instead of the
+candidate's questions.yaml; used by the evaluation tools), --notes-path FILE.
+Debug with: ollmcp -j examples/ollmcp-servers.json -m qwen3:8b-16k
 """
 
+import argparse
 import json
-import os
 from pathlib import Path
 
 from mcp.server.mcpserver import MCPServer
 
+from senjin.candidate import QUESTIONS, CandidateError, require_candidate_dir
 from senjin.mcp_server.store import InterviewStore
 
-ROOT = Path(__file__).resolve().parents[3]
-
-store = InterviewStore(
-    candidate_dir=Path(os.environ.get("SENJIN_CANDIDATE_DIR", ROOT / "examples/candidate")),
-    bank_dir=Path(os.environ.get("SENJIN_QUESTION_BANK", ROOT / "question_bank")),
-    notes_path=Path(p) if (p := os.environ.get("SENJIN_NOTES_PATH")) else None,
-    question_sets=[
-        n.strip() for n in os.environ.get("SENJIN_QUESTION_SET", "").split(",") if n.strip()
-    ]
-    or None,
-)
+store: InterviewStore  # built in main(); one interview per process
 
 mcp = MCPServer("senjin-interview")
 
@@ -56,5 +48,29 @@ def record_note(text: str) -> str:
     return store.record_note(text)
 
 
-if __name__ == "__main__":
+def build_store(
+    candidate_dir: Path, bank_dir: Path | None = None, notes_path: Path | None = None
+) -> InterviewStore:
+    if bank_dir is not None:
+        return InterviewStore(candidate_dir, bank_dir, notes_path)
+    require_candidate_dir(candidate_dir, questions=True)
+    return InterviewStore(candidate_dir, candidate_dir, notes_path, [Path(QUESTIONS).stem])
+
+
+def main() -> None:
+    global store
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--candidate-dir", type=Path)
+    parser.add_argument("--bank-dir", type=Path)
+    parser.add_argument("--notes-path", type=Path)
+    args = parser.parse_args()
+    try:
+        require_candidate_dir(args.candidate_dir)
+        store = build_store(args.candidate_dir, args.bank_dir, args.notes_path)
+    except CandidateError as exc:
+        raise SystemExit(f"error: {exc}") from None
     mcp.run()
+
+
+if __name__ == "__main__":
+    main()
