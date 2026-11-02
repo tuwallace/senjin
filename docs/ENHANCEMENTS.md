@@ -110,3 +110,20 @@ change; the audio is about 11% longer.
 - Speech-to-text mishearing candidates, such as names, has been a bigger problem so far than the
   candidate's difficulty hearing Senjin. Ask for candidate feedback on the voice before spending
   more here.
+
+## 4. Report upload
+
+**Idea.** Send a finished report (`data/reports/*.md` and `.json`) to a Google Drive folder or a
+Slack channel, only when a person asks for it. This was an optional item in Phase 7 of the roadmap
+and was moved here because the MVP does not need it. Nothing is built.
+
+**Rules if built**
+- A person starts every upload, naming the report and the destination. Nothing uploads
+  automatically after an interview.
+- It sends interview content to a cloud service, so it is outward-facing and should show the file
+  and destination, then wait for a yes, as the invite flow in section 2 does.
+- Reports hold candidate answers and scores. Keep names and contact details out, as the judge input
+  already does, and say plainly that the report is advisory.
+- Credentials stay in git-ignored `data/`, never in the repo.
+
+**Alternative.** Share the file by hand from `data/reports/`; this needs no code.

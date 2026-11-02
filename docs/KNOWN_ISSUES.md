@@ -28,9 +28,14 @@ earlier version it cited an unrelated resume item. Questions written for the job
 get a deterministic basis (the requirement they test), so this only affects shared ones. Watch it
 during testing.
 
-### Review: requirement lists and coverage vary between runs
+### Review: coverage is lenient, and output changes when inputs or prompts change
 
-The requirement list (10 to 13 items) and the coverage mapping change from run to run, the
-mapping is lenient (a question that merely mentions compliance may be credited with covering it),
-and the preferred section of a job description is sometimes skipped (the report warns when it
-is). Treat the coverage report as a guide to gaps, not a measurement.
+On 2026-11-02 three fresh runs on the same job description and resume gave the same 17
+requirements, the same 5 questions in the same order and the same coverage (45% weighted), because
+the judge runs at temperature 0. So the earlier "varies between runs" came from changed inputs,
+prompts or steering, not from sampling. Any edit to a prompt, the bank or the tags can still
+change the result.
+
+Still true: the mapping is lenient (a question that merely mentions compliance may be credited
+with covering it), and the preferred section of a job description is sometimes skipped (the
+report warns when it is). Treat the coverage report as a guide to gaps, not a measurement.

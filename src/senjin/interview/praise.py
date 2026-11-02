@@ -13,7 +13,7 @@ _PRAISE = (
 )
 # A whole opening sentence that is praise: "Great insights.", "That's a really good point."
 _PRAISE_SENTENCE = re.compile(
-    rf"^\s*(?:(?:that'?s|that is|what|this is)\s+)?(?:an?\s+)?(?:really\s+|very\s+|truly\s+)?"
+    rf"^\s*(?:(?:that['’]?s|that is|what|this is)\s+)?(?:an?\s+)?(?:really\s+|very\s+|truly\s+)?"
     rf"(?:{_PRAISE})\b(?!\s+(?:morning|afternoon|evening|to\s+(?:meet|hear|know)))[^.!?]*[.!?]+\s*",
     re.IGNORECASE,
 )

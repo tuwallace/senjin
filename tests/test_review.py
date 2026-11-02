@@ -461,6 +461,20 @@ def full_script(*, order=None, job=None, final=None, with_requirements=True):
     return ScriptedJudge(*replies)
 
 
+async def test_a_requirement_only_an_unselected_bank_question_covers_is_cut_not_a_gap(
+    candidate, bank
+):
+    reqs = (*REQS, ("Accessibility", "nice_to_have"))  # only web-2 is tagged for it
+    script = full_script(with_requirements=False)
+    judge = ScriptedJudge(requirements_reply(*reqs), *script.replies)
+    shown: list[str] = []
+    path = await review(candidate, judge, 2, 2, bank_dir=bank, show=shown.append)
+    text = "\n".join(shown)
+    assert "[ cut] Accessibility  ->  web-2" in text
+    assert "GAP] Accessibility" not in text
+    assert "web-2" not in [i["id"] for i in yaml.safe_load(path.read_text())]
+
+
 async def test_review_fills_the_gaps_the_bank_leaves(candidate, bank):
     judge = full_script()
     shown: list[str] = []

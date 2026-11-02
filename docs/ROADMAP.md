@@ -117,7 +117,7 @@ Prove audio with the built-in mic and speakers first.
 ## Phase 7: Hardening, evaluation, and ship (v1.0, 1 week)
 
 - Robustness: reconnect on network drop, silence watchdog ("Are you still there?"), time-boxed interview with a graceful wrap-up, crash-safe incremental transcript writes.
-- Report output: Markdown and JSON scorecard, written to `data/reports/`, optional upload to a Drive folder or Slack by an explicit user action.
+- Report output: Markdown and JSON scorecard, written to `data/reports/`. (The optional upload to Drive or Slack moved to `docs/ENHANCEMENTS.md`; not part of the MVP.)
 - Fairness and safety checks: strip names and demographic cues from the assessment input, run paired transcripts that differ only in cues (accent-transcribed text, gendered names) and check the score variance. Document limits in the README: advisory only, humans decide.
 - Optional containerization: Dockerfile for the MCP server, tests, and assessment job. The Ollama server and audio stay native on macOS. Provide a Linux compose file (with the blueprint's NVIDIA block) as a separate target only if you later move to a GPU box.
 - Exit: a full dress rehearsal with a human candidate on Meet, a reviewed report, and a `v1.0` tag.

@@ -182,6 +182,10 @@ async def review(
     for note in order_notes:
         show(f"   {note}")
     mapping, final_notes = await coverage_mapping(requirements, final, judge)
+    # The shared questions that were not selected still count as "cut", not "GAP".
+    mapping = {
+        name: list(dict.fromkeys([*ids, *pool_map.get(name, [])])) for name, ids in mapping.items()
+    }
     report = build_report(requirements, mapping, final, total, weights)
     report.notes += final_notes
     if note := preferred_note(job_description, requirements):

@@ -43,6 +43,18 @@ def test_strip_praise(said, kept):
     assert strip_praise(said) == kept
 
 
+def test_praise_with_a_curly_apostrophe_is_removed_mid_reply():
+    from senjin.interview.praise import PraiseFilter
+
+    reply = (
+        "You mentioned testing in Dev and staging. That\u2019s a solid approach. "
+        "The technical portion of the interview is complete."
+    )
+    f = PraiseFilter()
+    said = "".join(f.feed(reply[i : i + 7]) for i in range(0, len(reply), 7)) + f.flush()
+    assert "solid" not in said and "technical portion" in said and "Dev and staging." in said
+
+
 def test_markdown_is_not_spoken():
     from senjin.interview.praise import PraiseFilter
 

@@ -284,6 +284,31 @@ async def test_interrupted_unspoken_reply_does_not_use_up_a_question_or_a_turn()
     assert session.history[-1]["content"] == "Okay, so"
 
 
+async def test_cut_in_before_the_model_spoke_does_not_lose_the_follow_up():
+    class Slow(FakeLLM):  # the candidate cut in before the first word came back
+        quiet = False
+
+        async def stream(self, messages, tools=None):
+            if self.quiet:
+                return
+            async for chunk in super().stream(messages, tools):
+                yield chunk
+
+    llm = Slow([])
+    session = orchestrated(llm, OrchestratedTools(), technical=6)
+    await collect(session.open())
+    await collect(session.respond("ready"))
+    await collect(session.respond("my project"))  # technical: the question is asked
+    llm.quiet = True
+    await collect(session.respond("answer 1"))  # the follow-up is chosen, but nothing is said
+    assert session.history[-1]["role"] == "user"
+    session.interrupt("")
+    session.retract_candidate()
+    llm.quiet = False
+    await collect(session.respond("answer 1, in full"))
+    assert "FU-one?" in last_user(llm.calls[-1])  # still asked, not skipped
+
+
 async def test_empty_model_reply_is_not_counted_as_a_turn():
     class Silent(FakeLLM):
         async def stream(self, messages, tools=None):

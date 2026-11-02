@@ -363,6 +363,11 @@ class InterviewSession:
                 self.state.turns_in_phase = max(0, self.state.turns_in_phase - 1)
                 if self._undo_note:
                     self._undo_note()
+        elif last and last["role"] == "user" and not spoken.strip() and self._undo_note:
+            # Cut in before the model had produced a word: the follow-up or question chosen for
+            # this turn was never put to the candidate, so it must not be used up.
+            self._undo_note()
+            self._undo_note = None
         if self.log:
             self.log.append("interrupt", spoken.strip(), self.state.phase.value)
 
