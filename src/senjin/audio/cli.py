@@ -43,10 +43,12 @@ def voice_config(args) -> InterviewConfig:
     )
 
 
-def make_tts(kind: str):
+def make_tts(kind: str, pace: float | None = None):
     from senjin.audio.tts import PiperTTS, SayTTS
 
-    return SayTTS() if kind == "say" else PiperTTS()
+    if kind == "say":
+        return SayTTS()
+    return PiperTTS(pace=pace) if pace else PiperTTS()
 
 
 async def check(args) -> None:
@@ -83,7 +85,7 @@ async def run(args) -> None:
 
     ensure_models()
     out = args.out or Path("data/sessions") / f"voice-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
-    tts = make_tts(args.tts)
+    tts = make_tts(args.tts, cfg.voice_pace)
     stt = WhisperServerSTT(args.stt_model)
     print("Starting speech recognition...")
     await stt.start()
@@ -167,7 +169,7 @@ async def simulate(args) -> None:
 
     ensure_models()
     out = args.out or Path("data/sessions") / f"voicesim-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
-    tts = make_tts(args.tts)
+    tts = make_tts(args.tts, cfg.voice_pace)
     stt = WhisperServerSTT(args.stt_model)
     await stt.start()
     clips = [to_16k(await tts.synth(t), tts.sample_rate) for t in SIM_ANSWERS[: args.turns]]

@@ -11,6 +11,7 @@ from typing import Protocol
 import numpy as np
 
 from senjin.audio.models import PIPER_PATH
+from senjin.config import DEFAULT_VOICE_PACE
 
 
 class TTS(Protocol):
@@ -22,14 +23,18 @@ class TTS(Protocol):
 
 
 class PiperTTS:
-    def __init__(self, model_path: Path = PIPER_PATH) -> None:
-        from piper import PiperVoice
+    def __init__(self, model_path: Path = PIPER_PATH, pace: float = DEFAULT_VOICE_PACE) -> None:
+        from piper import PiperVoice, SynthesisConfig
+
+        self._config = SynthesisConfig(length_scale=pace)  # above 1.0 is slower
 
         self._voice = PiperVoice.load(str(model_path))
         self.sample_rate = self._voice.config.sample_rate
 
     def _synth(self, text: str) -> np.ndarray:
-        chunks = [c.audio_int16_array for c in self._voice.synthesize(text)]
+        chunks = [
+            c.audio_int16_array for c in self._voice.synthesize(text, syn_config=self._config)
+        ]
         return np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.int16)
 
     async def synth(self, text: str) -> np.ndarray:

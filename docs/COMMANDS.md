@@ -36,6 +36,7 @@ By default Senjin asks 5 interview questions: 2 about the candidate's background
 | `SENJIN_IDLE_SECONDS` | 25 | silence before "Are you still there?" (0 = off) |
 | `SENJIN_SILENCE_MS` | 1000 | silence that ends the candidate's turn (200 to 3000); lower is snappier but may cut people off |
 | `SENJIN_FILLER_MS` | 1100 | if no reply has started this long after the candidate stops, play a short "Okay, right." or "I see." (picked at random) (0 = off) |
+| `SENJIN_VOICE_PACE` | 1.2 | how slowly Senjin speaks with the Piper voice: 1.0 is its normal speed, 1.2 is 20% slower, which is easier to follow over a call (0.8 to 1.6) |
 | `SENJIN_DECISION_MODEL` | (off) | a local decision model such as `nimble` (`ollama pull nimble`, Ollama 0.35+) that double-checks whether the candidate has finished the Q&A when the rules say they have not. It acts only on a confident yes (0.8+), times out after 3 s and falls back to the rules; it adds about half a second to a Q&A turn, and it can never change a question |
 | `SENJIN_HOLD_MS` | 1500 | after a short (under 14 words) or trailing-off answer to a background or technical question, wait this much longer for the candidate to carry on before replying; if they do, both parts are answered as one (0 = off) |
 | `SENJIN_FOLLOW_UPS` | 1 | follow-ups after each technical question (0 to 3). `SENJIN_MAX_QUESTIONS` counts main questions, so the default asks 2 background questions and 3 separate technical questions, each followed by one follow-up |

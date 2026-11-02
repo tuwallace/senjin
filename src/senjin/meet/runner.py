@@ -48,7 +48,7 @@ async def run_meet_interview(
     log(bank_label(candidate_dir))
     bridge = find_bridge(speak=speak, hear=hear)  # fail fast, before opening a browser
     ensure_models()
-    tts = PiperTTS()
+    tts = PiperTTS(pace=cfg.voice_pace)
     stt = WhisperServerSTT(stt_model)
     log("Starting speech recognition...")
     await stt.start()

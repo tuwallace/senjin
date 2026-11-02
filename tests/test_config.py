@@ -322,3 +322,11 @@ def test_time_boxes_scale_with_the_question_count_unless_set():
     )
     assert pinned.minutes == 50 and pinned.state().max_total_seconds == 3000
     assert pinned.override(max_minutes=20).minutes == 20
+
+
+def test_voice_pace_defaults_to_a_little_slower_and_is_bounded():
+    assert InterviewConfig.from_env({}).voice_pace == 1.2
+    assert InterviewConfig.from_env({"SENJIN_VOICE_PACE": "1.0"}).voice_pace == 1.0
+    for bad in ("0.5", "2", "fast"):
+        with pytest.raises(ConfigError):
+            InterviewConfig.from_env({"SENJIN_VOICE_PACE": bad})

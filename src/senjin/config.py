@@ -15,6 +15,8 @@ SENJIN_HOLD_MS           after a short or unfinished answer, wait this much long
 SENJIN_DECISION_MODEL    a local decision model (for example nimble) that double-checks whether the
                          candidate has finished the Q&A when the rules say they have not (default:
                          off, rules only). It can only end the Q&A, never change a question.
+SENJIN_VOICE_PACE        how slowly Senjin speaks: 1.0 is the voice's normal speed, 1.2 is 20%
+                         slower (default 1.2, 0.8 to 1.6)
 SENJIN_FILLER_MS         play "Okay, right." or "I see." if no reply has started this long
                          after the candidate stops (default 1100, 0 turns it off)
 
@@ -38,6 +40,7 @@ class ConfigError(ValueError):
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
+DEFAULT_VOICE_PACE = 1.2  # slower than the voice's own pace: easier to follow over a call
 MINUTES_PER_TURN = 2.0  # allowance per interviewer turn when the interview is long
 EXTRA_MINUTES = 10  # greeting, the candidate's own questions and the goodbye
 
@@ -119,6 +122,7 @@ class InterviewConfig:
     silence_ms: int = 1000
     filler_ms: int = 1100
     hold_ms: int = 1500
+    voice_pace: float = DEFAULT_VOICE_PACE
     decision_model: str = ""  # "": the rules decide alone
     follow_ups: int = 1  # per technical question; each main question gets its own turn first
     minutes_per_turn: float = MINUTES_PER_TURN
@@ -145,6 +149,7 @@ class InterviewConfig:
             silence_ms=int(_number(env, "SENJIN_SILENCE_MS", 1000, 200, 3000)),
             filler_ms=int(_number(env, "SENJIN_FILLER_MS", 1100, 0, 10000)),
             hold_ms=int(_number(env, "SENJIN_HOLD_MS", 1500, 0, 5000)),
+            voice_pace=_number(env, "SENJIN_VOICE_PACE", DEFAULT_VOICE_PACE, 0.8, 1.6),
             decision_model=env.get("SENJIN_DECISION_MODEL", "").strip(),
             follow_ups=int(_number(env, "SENJIN_FOLLOW_UPS", 1, 0, 3)),
         )
