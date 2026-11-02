@@ -36,6 +36,14 @@ async def mic_frames(
             yield await queue.get()
 
 
+def resample_int16(audio: np.ndarray, source: int, target: int) -> np.ndarray:
+    """Linear resampling of mono int16 audio; unchanged when the rates match."""
+    if source == target or len(audio) == 0:
+        return audio
+    positions = np.linspace(0, len(audio) - 1, max(1, round(len(audio) * target / source)))
+    return np.interp(positions, np.arange(len(audio)), audio).astype(np.int16)
+
+
 class Player:
     """Plays queued clips; stop() cuts audio immediately. Tracks which clips began playing."""
 
@@ -51,13 +59,27 @@ class Player:
         self._lock = threading.Lock()
         self.started: list[str] = []
         self.first_sample_at: float | None = None
-        self._stream = sd.OutputStream(
-            samplerate=sample_rate, channels=channels, dtype="int16", device=device,
+        self._device_rate = sample_rate  # what the device runs at; clips are resampled to it
+        try:
+            self._stream = self._open(sd, sample_rate, device)
+        except sd.PortAudioError:
+            # Some devices (BlackHole) accept only their own rate while another app holds them.
+            rate = int(sd.query_devices(device, "output")["default_samplerate"])
+            if rate == sample_rate:
+                raise
+            self._stream = self._open(sd, rate, device)
+            self._device_rate = rate
+
+    def _open(self, sd, rate: int, device):
+        stream = sd.OutputStream(
+            samplerate=rate, channels=self._channels, dtype="int16", device=device,
             callback=self._callback,
         )  # fmt: skip
-        self._stream.start()
+        stream.start()
+        return stream
 
     def enqueue(self, audio: np.ndarray, tag: str) -> None:
+        audio = resample_int16(audio, self.sample_rate, self._device_rate)
         with self._lock:
             self._clips.append((tag, audio))
 

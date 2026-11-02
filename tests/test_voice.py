@@ -539,3 +539,38 @@ async def test_an_unfinished_dont_know_is_still_held():
     until = lambda: len(loop.records) >= 2 and not loop.busy  # noqa: E731
     await asyncio.wait_for(loop.run(frames(script, {}, until)), 15)
     assert loop.records[-1].get("held_s", 0) > 0.2
+
+
+def test_player_falls_back_to_the_device_rate_when_it_refuses_the_voice_rate(monkeypatch):
+    import sys
+    import types
+
+    import numpy as np
+
+    from senjin.audio.devices import Player, resample_int16
+
+    class PortAudioError(Exception):
+        pass
+
+    opened: list[int] = []
+
+    class Stream:
+        def __init__(self, samplerate, **kw):
+            if samplerate != 48000:
+                raise PortAudioError("-9986")
+            opened.append(samplerate)
+
+        def start(self):
+            pass
+
+    fake = types.SimpleNamespace(
+        OutputStream=Stream,
+        PortAudioError=PortAudioError,
+        query_devices=lambda device, kind: {"default_samplerate": 48000.0},
+    )
+    monkeypatch.setitem(sys.modules, "sounddevice", fake)
+    player = Player(22050, device=5, channels=2)
+    assert opened == [48000] and player.sample_rate == 22050  # callers still pass 22.05 kHz clips
+    player.enqueue(np.ones(2205, dtype=np.int16), "a")
+    assert len(player._clips[0][1]) == 4800  # 0.1 s at the device rate
+    assert resample_int16(np.arange(5, dtype=np.int16), 8, 8).tolist() == [0, 1, 2, 3, 4]
