@@ -183,7 +183,7 @@ async def test_orchestrated_resume_goes_in_system_message_not_history():
     assert "RESULT:get_candidate_resume" in messages[0]["content"]
     assert all(m["role"] in {"user", "assistant"} for m in messages[1:])  # no tool messages
     assert llm.tools_seen[-1] is None  # the model gets no tools: no extra round trips
-    assert len(llm.calls) == 2
+    assert len(llm.calls) == 1  # the greeting is fixed text, so only the reply uses the model
 
 
 async def test_technical_asks_question_then_follow_ups_once_each_then_next_question():
@@ -470,6 +470,7 @@ async def test_warm_up_loads_context_and_sends_the_fixed_prompt_before_the_call(
     system = llm.warmed[0][0]["content"]
     assert "RESULT:get_candidate_resume" in system and "RESULT:get_job_description" in system
     await collect(session.open())
+    await collect(session.respond("ready"))
     assert llm.calls[0][0]["content"] == system  # the real prompt starts the same way
 
 
@@ -604,3 +605,41 @@ async def test_decision_model_is_not_asked_about_questions_or_by_default():
     plain = await _in_qa(None)
     await collect(plain.respond("Yeah, that covers everything for me, thanks."))
     assert plain.state.phase == Phase.CANDIDATE_QA  # rules alone, as before
+
+
+async def test_warming_the_session_also_warms_the_decision_model():
+    decider = FakeDecider(0.5)
+    session = orchestrated(FakeLLM([]))
+    session.decider = decider
+    await session.warm()
+    assert decider.calls == [{"candidate_said": "Yes."}]
+
+
+def test_the_greeting_tells_the_candidate_about_the_ai_the_transcript_and_the_human_decision():
+    from senjin.interview.prompts import PHASE_INSTRUCTIONS
+
+    intro = PHASE_INSTRUCTIONS[Phase.INTRO]
+    assert "AI interviewer" in intro and "transcribed" in intro
+    assert "a person reviews the transcript and makes the hiring decision" in intro
+    assert "ask to stop at any time" in intro
+
+
+async def test_the_orchestrated_greeting_is_fixed_text_with_every_part_of_the_notice():
+    from senjin.interview.prompts import GREETING
+
+    llm = FakeLLM([])
+    session = orchestrated(llm)
+    said = await collect(session.open())
+    assert said == GREETING and llm.calls == []  # no model call, nothing to paraphrase away
+    assert session.history[-1] == {"role": "assistant", "content": GREETING}
+    assert session.state.turns_in_phase == 1
+    for part in (
+        "AI interviewer",
+        "transcribed",
+        "reviews the transcript and makes the hiring decision",
+        "ask to stop at any time",
+        "technical questions",
+        "ready to begin?",
+    ):
+        assert part in GREETING
+    assert "good morning" not in GREETING.lower()

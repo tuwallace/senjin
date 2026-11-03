@@ -174,7 +174,14 @@ def _match(name: str, targets: list[Requirement]) -> Requirement | None:
 
 
 def _slug(topic: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", topic.lower()).strip("_") or "general"
+    """A short id-safe topic. The model sometimes copies the requirement's kind into it
+    ("..._must_have"); that is not a topic."""
+    text = re.sub(r"[_\-]+", " ", topic.lower())
+    text = re.sub(r"\b(must have|nice to have)\b", " ", text)
+    slug = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+    if len(slug) > 40:
+        slug = slug[:40].rsplit("_", 1)[0] or slug[:40]
+    return slug or "general"
 
 
 def check(

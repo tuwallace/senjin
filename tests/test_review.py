@@ -475,6 +475,16 @@ async def test_a_requirement_only_an_unselected_bank_question_covers_is_cut_not_
     assert "web-2" not in [i["id"] for i in yaml.safe_load(path.read_text())]
 
 
+def test_a_topic_never_carries_the_requirement_kind_into_the_question_id():
+    from senjin.review.generate import _slug
+
+    assert _slug("design_comprehensive_test_suites_must_have") == "design_comprehensive_test_suites"
+    assert _slug("Must have") == "general"
+    assert _slug("caching (nice to have)") == "caching"
+    long = _slug("Enforce ISO 9001 quality management systems and audits in delivery")
+    assert len(long) <= 40 and not long.endswith("_")
+
+
 async def test_review_fills_the_gaps_the_bank_leaves(candidate, bank):
     judge = full_script()
     shown: list[str] = []

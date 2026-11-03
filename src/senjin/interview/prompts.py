@@ -26,7 +26,9 @@ PHASE_INSTRUCTIONS: dict[Phase, str] = {
         'Phase: introduction. Greet the candidate with just "Hello" (you do not know the time of '
         "day, so never say good morning, afternoon or evening), say your name is Senjin and that "
         "you are an AI interviewer, "
-        "say the conversation is transcribed, and outline the format: background, technical "
+        "say the conversation is transcribed and that a person reviews the transcript and makes "
+        "the hiring decision, not you, and that they may ask to stop at any time. Keep all of "
+        "that, in short sentences. Then outline the format: background, technical "
         "questions, then time for their questions. Ask if they are ready to begin."
     ),
     Phase.RESUME_DIVE: (
@@ -146,6 +148,14 @@ def phase_message(phase: Phase, *, orchestrated: bool = False) -> str:
 
 
 KICKOFF = "[The call has connected and the candidate is present. Begin the interview.]"
+
+# The greeting is fixed text, not model output, so the notice and the question are always said.
+GREETING = (
+    "Hello. I'm Senjin, an AI interviewer. This conversation is transcribed. A person reviews "
+    "the transcript and makes the hiring decision, not me. You may ask to stop at any time. "
+    "We'll start with your background, then technical questions, and then there will be time "
+    "for your questions. Are you ready to begin?"
+)
 
 EXEMPLAR_HEADER = (
     "\n\nExamples of how skilled interviewers follow up. Copy the manner (a brief "

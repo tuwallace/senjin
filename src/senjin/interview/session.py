@@ -17,6 +17,7 @@ from senjin.interview.lookup import relevant_lines
 from senjin.interview.praise import PraiseFilter
 from senjin.interview.prompts import (
     EXEMPLAR_HEADER,
+    GREETING,
     HINT_FORMAT,
     KICKOFF,
     NOTE_FORMAT,
@@ -126,6 +127,11 @@ class InterviewSession:
     async def open(self) -> AsyncIterator[str]:
         """The interviewer speaks first."""
         await self._load_context()
+        if self.prefetch:  # orchestrated (voice, Meet): the notice must never be paraphrased away
+            self._record("assistant", GREETING)
+            self.state.record_interviewer_turn()
+            yield GREETING
+            return
         async for chunk in self._reply():
             yield chunk
 
@@ -226,6 +232,10 @@ class InterviewSession:
         if self.prefetch and warm:
             system = {"role": "system", "content": f"{SYSTEM_PROMPT}{self._context}"}
             await warm([system, {"role": "user", "content": KICKOFF}])
+        if self.decider:  # a cold decision model can miss its 3 s limit on the first real call
+            await self.decider.probability(
+                "ready", {"candidate_said": "Yes."}, "Is the candidate ready?"
+            )
 
     async def _load_context(self) -> None:
         """Orchestrated mode: put the resume and job description in the system prompt up front.
