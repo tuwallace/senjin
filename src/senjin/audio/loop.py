@@ -33,6 +33,7 @@ APOLOGY = "Sorry, I had a technical problem. Could you say that again?"
 FILLER_TAG = "\x00filler:"  # marks filler clips so they never count as spoken interviewer words
 # Plain words only: Piper spells out interjections such as "Mm-hm" letter by letter.
 FILLERS = ["Okay, right.", "I see."]
+LATE_FILLER_S = 2.5  # a filler right after another one waits this long for the real reply
 GOODBYE_ERRORS = (
     "I'm having technical difficulties, so I'll end the call here. "
     "Someone from the team will follow up with you. Goodbye."
@@ -96,7 +97,8 @@ class VoiceLoop:
         self._recover = False
         self._fillers: list[tuple[str, np.ndarray]] = []
         self._rng = random.Random()
-        self._filled_last_turn = False  # never two fillers in a row: it would sound canned
+        self._filled_last_turn = False  # right after a filler, the next one waits longer
+        self._last_filler = ""
 
     @property
     def busy(self) -> bool:
@@ -281,7 +283,6 @@ class VoiceLoop:
             t_end is not None
             and self._fillers
             and self.config.filler_delay_ms
-            and not self._filled_last_turn
             and len(rec.get("text", "").split()) >= 3  # never after "Hello?" or "Yes."
         ):
             filler = asyncio.create_task(self._filler_after(rec, t_end))
@@ -304,12 +305,17 @@ class VoiceLoop:
 
     async def _filler_after(self, rec: dict, t_end: float) -> None:
         """If no reply audio exists by the delay, play a short neutral acknowledgement."""
-        wait = (self.config.filler_delay_ms or 0) / 1000 - (self.clock() - t_end)
+        delay = (self.config.filler_delay_ms or 0) / 1000
+        if self._filled_last_turn:  # two in a row sound canned, so only when the wait is long
+            delay = max(delay, LATE_FILLER_S)
+        wait = delay - (self.clock() - t_end)
         if wait > 0:
             await asyncio.sleep(wait)
         if "_enqueued_at" in rec:  # the real reply got there first
             return
-        phrase, audio = self._rng.choice(self._fillers)
+        choices = [f for f in self._fillers if f[0] != self._last_filler] or self._fillers
+        phrase, audio = self._rng.choice(choices)
+        self._last_filler = phrase
         rec["filler"] = phrase
         self.player.enqueue(audio, FILLER_TAG + phrase)
         if self.session.log:

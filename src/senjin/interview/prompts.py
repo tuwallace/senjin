@@ -98,6 +98,11 @@ NOTES = {
         "slightly simpler way in one or two sentences, with the same meaning and no hints or "
         'answers. Your last message was: "{previous}"'
     ),
+    "forgot": (
+        "The candidate says they lost part of your last question. In one or two sentences, ask "
+        "again only for the part they have not answered yet, in simpler words, with no hints or "
+        'answers. Your last question was: "{previous}"'
+    ),
     "resume_angles": [
         "a decision they personally made and why",
         "a trade-off they weighed",

@@ -426,6 +426,28 @@ async def test_no_filler_on_two_turns_in_a_row():
     assert "filler" not in loop.records[2]
 
 
+async def test_a_very_slow_reply_gets_a_late_filler_even_right_after_one(monkeypatch):
+    import senjin.audio.loop as loop_module
+
+    monkeypatch.setattr(loop_module, "LATE_FILLER_S", 0.3)
+    llm = SlowLLM(["Welcome, ready?", "Okay. Tell me more.", "Thanks. And then?"], 0.9)
+    session = InterviewSession(llm)
+    config = VoiceConfig(idle_prompt_s=None, filler_delay_ms=100)
+    loop = VoiceLoop(
+        session,
+        fake_vad,
+        FakeSTT(["my first answer", "my second answer"]),
+        FakeTTS(),
+        FakePlayer(0.03),
+        config,
+    )
+    script = "." * 40 + "s" * 20 + "." * 120 + "s" * 20
+    until = lambda: len(loop.records) >= 3 and not loop.busy  # noqa: E731
+    await asyncio.wait_for(loop.run(frames(script, {}, until)), 20)
+    first, second = loop.records[1].get("filler"), loop.records[2].get("filler")
+    assert first and second and first != second  # a different phrase, since the wait was long
+
+
 async def test_unfinished_fragment_is_merged_with_the_rest_of_the_answer(tmp_path):
     from senjin.interview.transcript import TranscriptLog
 

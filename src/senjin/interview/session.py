@@ -76,6 +76,16 @@ _REPEAT_REQUEST = re.compile(
     re.IGNORECASE,
 )
 
+# "I forgot the last part of the question": the candidate answered some of it. Not "I forgot to
+# mention ...", which is more answer.
+_FORGOT_PART = re.compile(
+    r"\bi'?(ve)? ?(have )?(forgot|forgotten|forget|lost track of|"
+    r"(don'?t|can'?t|do not|cannot) remember)\b[^.?!]{0,40}"
+    r"\b(question|part|what you (asked|said))\b|"
+    r"what was the (last|second|other|rest|first) part|remind me (of )?(the|what)",
+    re.IGNORECASE,
+)
+
 
 class InterviewSession:
     def __init__(
@@ -125,7 +135,8 @@ class InterviewSession:
         self._last_candidate_text = candidate_text
         await self._load_context()
         now = self.clock()
-        repeat = self.asks_to_repeat(candidate_text)
+        forgot = self.forgot_part(candidate_text)
+        repeat = self.asks_to_repeat(candidate_text) or forgot
         if target := self.state.wrap_up_target(now):
             self.state.jump(target, now)
             await self._enter_phase()
@@ -146,11 +157,17 @@ class InterviewSession:
         self._undo_note = None
         if repeat:
             self._free_turn = True
-            note = NOTES["repeat"].format(previous=self._previous_interviewer_text())
+            note = NOTES["forgot" if forgot else "repeat"].format(
+                previous=self._previous_interviewer_text()
+            )
         else:
             note = await self._turn_note() if self.prefetch else None
         async for chunk in self._reply(examples, note):
             yield chunk
+
+    def forgot_part(self, text: str) -> bool:
+        in_questions = self.state.phase in (Phase.RESUME_DIVE, Phase.TECHNICAL)
+        return bool(self.prefetch and in_questions and _FORGOT_PART.search(text))
 
     def asks_to_repeat(self, text: str) -> bool:
         in_questions = self.state.phase in (Phase.RESUME_DIVE, Phase.TECHNICAL)

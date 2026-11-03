@@ -374,6 +374,44 @@ async def test_repeat_request_asks_the_same_question_again_without_using_a_turn(
     assert "FU-one?" in last_user(llm.calls[-1])  # the follow-up was not skipped or spent
 
 
+async def test_a_candidate_who_lost_part_of_the_question_is_asked_for_that_part():
+    llm = FakeLLM([])
+    session = orchestrated(llm, technical=6)
+    await collect(session.open())
+    await collect(session.respond("ready"))
+    await collect(session.respond("my project"))  # technical: the question is asked
+    turns = session.state.turns_in_phase
+    said = (
+        "I would keep the keys in a vault and fetch them at start. "
+        "I forgot the last part of the question, but that is how I would approach it."
+    )
+    await collect(session.respond(said))
+    note = last_user(llm.calls[-1])
+    assert (
+        "lost part of your last question" in note and "How would you design a rate limiter?" in note
+    )
+    assert session.state.turns_in_phase == turns  # not counted
+    await collect(session.respond("answer 1"))
+    assert "FU-one?" in last_user(llm.calls[-1])  # the follow-up is still to come
+
+
+@pytest.mark.parametrize(
+    "said",
+    [
+        "I forgot to mention that we also used Redis for the shared store.",
+        "I would not forget the retry part, so I would add backoff and jitter.",
+    ],
+)
+async def test_forgetting_to_mention_something_is_still_an_answer(said):
+    llm = FakeLLM([])
+    session = orchestrated(llm, technical=6)
+    await collect(session.open())
+    await collect(session.respond("ready"))
+    await collect(session.respond("my project"))
+    await collect(session.respond(said))
+    assert "lost part of your last question" not in last_user(llm.calls[-1])
+
+
 async def test_a_long_answer_mentioning_repeat_is_still_an_answer():
     llm = FakeLLM([])
     session = orchestrated(llm, technical=6)

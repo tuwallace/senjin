@@ -9,10 +9,12 @@ Phases marked **planned** have no code yet; their commands are the intended ones
 | 1 Text interviewer | done | `v0.1` |
 | 2 MCP context | done | `v0.2` |
 | 3 Assessment | done | `v0.3` |
-| 4 Anthropic dataset | planned | `v0.4` |
+| 4 Anthropic dataset | done | `v0.4` |
 | 5 Voice loop | done | `v0.5` |
-| 6 Google Meet bot | built, not run against real Meet | `v0.6` |
-| 7 Hardening | built; `v1.0` waits for a live dress rehearsal | `v0.7` |
+| 6 Google Meet bot | done; run live with a human candidate | `v0.6` |
+| 7 Hardening | done | `v0.7` |
+| 8 Per-candidate review and plans | done | `v0.8` |
+| Release | `v1.0` not tagged yet | |
 
 ## Prerequisites (once)
 
@@ -35,7 +37,7 @@ By default Senjin asks 5 interview questions: 2 about the candidate's background
 | `SENJIN_MAX_MINUTES` | scaled | time box for the whole interview. Unset, it scales with the question count: about 2 minutes per interviewer turn (a question, or a follow-up) plus 10 for the greeting, the candidate's questions and the goodbye, never below the phase caps (5 minutes background, 15 technical). The default 5 questions give 30 minutes; 18 questions (6 background) give 70. |
 | `SENJIN_IDLE_SECONDS` | 25 | silence before "Are you still there?" (0 = off) |
 | `SENJIN_SILENCE_MS` | 1000 | silence that ends the candidate's turn (200 to 3000); lower is snappier but may cut people off |
-| `SENJIN_FILLER_MS` | 1100 | if no reply has started this long after the candidate stops, play a short "Okay, right." or "I see." (picked at random) (0 = off) |
+| `SENJIN_FILLER_MS` | 1100 | if no reply has started this long after the candidate stops, play a short "Okay, right." or "I see." (picked at random, never the same one twice running; right after a filler the next waits 2.5 s) (0 = off) |
 | `SENJIN_VOICE_PACE` | 1.2 | how slowly Senjin speaks with the Piper voice: 1.0 is its normal speed, 1.2 is 20% slower, which is easier to follow over a call (0.8 to 1.6) |
 | `SENJIN_DECISION_MODEL` | (off) | a local decision model such as `nimble` (`ollama pull nimble`, Ollama 0.35+) that double-checks whether the candidate has finished the Q&A when the rules say they have not. It acts only on a confident yes (0.8+), times out after 3 s and falls back to the rules; it adds about half a second to a Q&A turn, and it can never change a question |
 | `SENJIN_HOLD_MS` | 1500 | after a short (under 14 words) or trailing-off answer to a background or technical question, wait this much longer for the candidate to carry on before replying; if they do, both parts are answered as one (0 = off) |

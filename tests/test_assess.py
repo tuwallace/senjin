@@ -75,6 +75,27 @@ async def test_quote_in_wrong_turn_is_relocated():
     assert report.assessment.strengths[0].evidence[0].turn == 5
 
 
+async def test_a_quote_that_differs_only_in_punctuation_still_verifies():
+    from senjin.assess.verify import verify
+
+    spoken = {5: "You can use a vault, and pull the value, translate the key to the value."}
+    from senjin.assess.schema import Assessment
+
+    def with_quote(quote):
+        return Assessment.model_validate_json(
+            payload(strengths=[{"text": "x", "evidence": [{"turn": 5, "quote": quote}]}])
+        )
+
+    kept, info = verify(with_quote("use a vault and pull the value."), spoken)
+    assert info.dropped_findings == 0 and kept.strengths  # full stop for a comma
+    _, info = verify(with_quote("Use a vault, and PULL the value"), spoken)
+    assert info.dropped_findings == 0
+    _, info = verify(with_quote("pull the value from a vault"), spoken)  # words out of order
+    assert info.dropped_findings == 1
+    _, info = verify(with_quote("use a database and pull the value"), spoken)  # a changed word
+    assert info.dropped_findings == 1
+
+
 async def test_invented_quote_is_dropped_and_confidence_lowered():
     mixed = payload(
         strengths=[

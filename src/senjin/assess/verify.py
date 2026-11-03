@@ -6,7 +6,11 @@ from senjin.assess.schema import Assessment, Evidence, Finding, Verification
 
 
 def _norm(text: str) -> str:
-    return re.sub(r"\s+", " ", text).strip().lower()
+    """Words only: case, spacing and punctuation differences (a quote that ends in a full stop
+    where the speaker's sentence goes on with a comma) do not make a real quote unverifiable.
+    The words themselves must still appear in the same order."""
+    text = text.replace("\u2019", "'").lower()
+    return re.sub(r"\s+", " ", re.sub(r"[^\w']+", " ", text)).strip()
 
 
 def _locate(ev: Evidence, turns: dict[int, str]) -> int | None:
