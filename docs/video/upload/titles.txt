@@ -1,0 +1,3 @@
+I built an AI interviewer that runs entirely on my Mac (recommended)
+An AI interviewed a candidate on Google Meet. Everything ran locally.
+Local AI technical interviewer: how it works and what broke

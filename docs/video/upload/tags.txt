@@ -1,0 +1,1 @@
+AI interviewer, local LLM, Ollama, Google Meet bot, whisper.cpp, Piper TTS, voice AI, technical interview, hiring, Python, AI engineering, offline AI

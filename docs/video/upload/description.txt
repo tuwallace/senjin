@@ -1,0 +1,29 @@
+I built an AI technical interviewer that runs entirely on a Mac: it joins a Google Meet, tells the candidate it is an AI,
+asks questions drawn from the resume and the job description, listens, follows up, answers the candidate's own questions,
+and writes an advisory report. Local models only (Ollama, whisper.cpp, Piper). A person makes the hiring decision.
+Code and docs: https://github.com/tuwallace/senjin
+
+0:00 A real call
+0:30 What Senjin is
+1:10 Planning from a resume and a job description
+2:10 The call
+3:30 Code asks, the model only phrases
+4:10 The report: quotes it can prove
+5:00 Checking it honestly
+5:45 What went wrong
+6:25 Limits and takeaways
+
+HOW TO READ THE NUMBERS
+The latency figures (about 2 seconds to first sound, 19 turns) come from one live interview with one human candidate on one
+Mac. The fairness and repeatability checks use a small set of paired transcripts. They are checks, not benchmarks.
+
+ABOUT THIS VIDEO
+- The interviewer's voice is synthetic (Piper). The narration is [your voice / a synthetic voice: edit before upload].
+- The candidate in the demo is the author, who knew an AI would interview them.
+- The assessment is advisory only. A person reads the transcript and decides. Rules about automated interviews differ by
+  place; this video is not legal advice.
+
+CREDITS
+Tools: Ollama (qwen3, qwen2.5), whisper.cpp, Piper, Silero VAD, BlackHole, Playwright, Google Meet.
+Interviewer style was studied from the Anthropic Interviewer dataset (Hugging Face; MIT per its card, which also mentions
+CC-BY).
