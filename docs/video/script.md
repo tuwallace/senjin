@@ -1,6 +1,6 @@
 # Video script: "I built an AI interviewer that runs entirely on my Mac"
 
-Target length: about 7 minutes (about 950 spoken words at a relaxed pace). Everything on screen uses the
+Target length: about 6 minutes (about 900 spoken words). Everything on screen uses the
 `data/candidates/jane` folder (the candidate is the author, who agreed to be shown). Narration is written to be read
 aloud; change anything that does not sound like you. Recording steps are in `live-recording-guide.md`; the upload text
 is in `upload/`.
@@ -12,15 +12,16 @@ Every number below comes from this repository's own runs. The latency numbers ar
 
 | # | Time | Segment | Type |
 |---|---|---|---|
-| 1 | 0:00 | Hook | LIVE (the call) |
+| 1 | 0:00 | Hook | CLIP (mock call) |
 | 2 | 0:30 | What Senjin is | SLIDE |
 | 3 | 1:10 | Planning from a resume and a job description | LIVE (terminal) |
-| 4 | 2:10 | The call: the greeting, then the interview | LIVE (Meet) |
-| 5 | 3:30 | Code asks, the model only phrases | SLIDE |
-| 6 | 4:10 | The report: quotes it can prove | LIVE (terminal) |
-| 7 | 5:00 | Checking it honestly | SLIDE |
-| 8 | 5:45 | What went wrong | SLIDE |
-| 9 | 6:25 | Limits and takeaways | SLIDE |
+| 4 | 1:33 | Inside a call: one reply, start to finish | ANIMATION |
+| 5 | 2:26 | Code asks, the model only phrases | SLIDE |
+| 6 | 2:53 | The report: quotes it can prove | LIVE (terminal) |
+| 7 | 3:22 | Checking it honestly | SLIDE |
+| 8 | 3:48 | What went wrong | SLIDE |
+| 9 | 4:23 | What could come next | SLIDE |
+| 10 | 5:36 | Limits and takeaways | SLIDE |
 
 ---
 
@@ -35,7 +36,7 @@ answering "Yes." Caption: "A real call. The interviewer is a local AI."
 > asked follow-ups, and afterwards wrote an assessment. A person still makes the hiring decision. Here is how it works,
 > and what broke along the way.
 
-## 2. What Senjin is (0:30)
+## 2. What Senjin is (0:26)
 
 **Visual (SLIDE):** pipeline: resume + job description, plan, questions, Meet call, transcript, report. Stack row
 underneath: Ollama (qwen3 8B for the interview, a 32B judge for scoring), whisper.cpp, Piper, Silero VAD, BlackHole,
@@ -47,7 +48,7 @@ Playwright.
 > audio devices into Google Meet. After the call, a bigger local model scores the transcript. All of it runs on one
 > Mac.
 
-## 3. Planning from a resume and a job description (1:10)
+## 3. Planning from a resume and a job description (0:51)
 
 **Visual (LIVE terminal):** `cat data/candidates/jane/interview.yaml`, then the top of `questions.coverage.md`: the
 requirement table with `asked` and `gap` statuses.
@@ -60,20 +61,23 @@ requirement table with `asked` and `gap` statuses.
 > five questions. That gap is visible before anyone is interviewed, and you can edit the questions file by hand. The
 > candidate's name and contact details are removed before any model sees the resume.
 
-## 4. The call (2:10)
+## 4. Inside a call (1:33)
 
-**Visual (LIVE):** the Meet recording, cut to about 80 seconds: the greeting, a background answer and follow-up, one
-technical question, the candidate saying "Can you repeat that question, please?" and Senjin rephrasing, then the end.
-Show the live transcript lines in a terminal beside it if the layout allows.
+**Visual (ANIMATION, `call_animation.py`):** six boxes light up in turn as each spoken phrase lands: call audio,
+voice detector, speech to text, interview code, local model, voice. A dot carries the reply from box to box. Below
+them, a filler-clip box and a barge-in box light on their sentence, then a badge reads "about 2 s". A transcript
+panel shows a real exchange from the call (the candidate asks for a repeat; Senjin rephrases the question).
 
 **Narration:**
-> In the call, the first thing it says is fixed text: it is an AI, the conversation is transcribed, a person decides,
-> you can ask to stop, here is the format, are you ready? That text is not left to the model, because early on the model
-> kept dropping parts of it. Then it asks. It waits for you to finish, replies in about two seconds, and plays a short
-> "I see" when a reply is slow. If you cut in, it stops talking. If you ask it to repeat, it says the question again in
-> simpler words. And in the last part, you can ask about the role, and it answers only from the job description.
+> Here is what happens inside the call, one reply at a time. The candidate speaks, and the call's audio reaches
+> Senjin through a virtual audio device. A voice detector waits for them to stop, about a second of quiet, and holds a
+> little longer after a short answer in case they carry on. Whisper turns the speech into text, in well under a
+> second. Then the code, not the model, decides what happens next: a follow-up, the next question, or the end. The
+> local model only puts that into natural words. Piper speaks the reply back into the call, a sentence at a time. If a
+> reply is slow, a short "I see" fills the gap. If the candidate cuts in, Senjin stops talking. In the last live call,
+> that whole loop took about two seconds, from the end of speech to the first sound.
 
-## 5. Code asks, the model only phrases (3:30)
+## 5. Code asks, the model only phrases (2:26)
 
 **Visual (SLIDE):** two columns. "Code decides": which question, when to follow up, when to move on, when to stop.
 "Model does": say it naturally, acknowledge, answer from the job description. Small note: "never praise, never hint".
@@ -84,7 +88,7 @@ Show the live transcript lines in a terminal beside it if the layout allows.
 > from being invented, and lets me test the flow with fakes instead of real models. The interviewer is also told never
 > to praise or criticize, and a filter removes praise if the model slips.
 
-## 6. The report (4:10)
+## 6. The report (2:53)
 
 **Visual (LIVE terminal):** `senjin-assess` output or `data/reports/meet-20261103-132204.md`: the recommendation line,
 the hiring-bar note, then one weakness with its quoted evidence.
@@ -95,7 +99,7 @@ the hiring-bar note, then one weakness with its quoted evidence.
 > fixed hiring bar applies. In this run the judge said Hire, the bar said technical six is below seven, and the report
 > says so in plain words: No Hire, low confidence, and why it changed. It is advisory. Someone has to read the transcript.
 
-## 7. Checking it honestly (5:00)
+## 7. Checking it honestly (3:22)
 
 **Visual (SLIDE):** four lines. "Same inputs, same report: 0 variance (temperature 0)". "302 offline tests, no model
 calls". "Fairness check: names and cues swapped, scores held". "Live call: 19 turns, about 2.1 s to first sound".
@@ -106,7 +110,7 @@ calls". "Fairness check: names and cues swapped, scores held". "Live call: 19 tu
 > redaction version stayed level. And speed: in the last live call it took about two seconds from the candidate
 > stopping to the first sound. The tests do not call any model. They use fakes, so they run anywhere.
 
-## 8. What went wrong (5:45)
+## 8. What went wrong (3:48)
 
 **Visual (SLIDE):** a short list, one line each, with a small "fixed" tick.
 
@@ -117,7 +121,28 @@ calls". "Fairness check: names and cues swapped, scores held". "Live call: 19 tu
 > drop the notice, which is why it is fixed text now. I also tried a small decision model to detect when the candidate
 > is finished. It was more accurate on my small test set, but slower, so it is off by default.
 
-## 9. Limits and takeaways (6:25)
+## 9. What could come next (4:23)
+
+Summarizes `docs/ENHANCEMENTS.md`. None of these is on the roadmap; the document says what is built, what is only
+proposed, and what must be checked first.
+
+**Visual (SLIDE):** four rows, each with a status tag: "Decision models: built, opt-in, off", "Scheduling and hosting
+the Meet: proposed", "A clearer voice: slower Piper voice built", "Report upload: proposed". A footer reads "Not built
+unless marked. Not legal advice."
+
+**Narration:**
+> Four ideas are written down but not on the roadmap. First, small decision models. Ollama serves tiny models that
+> answer questions like "has the candidate finished?" with a probability. I wired one in as a second opinion on when
+> the candidate's questions are over. On seventy hand-labelled turns it beat my rules on that decision, forty-three
+> right to forty, but it added about six hundred milliseconds a call, so it is off by default. Second, scheduling.
+> After the review, Senjin could draft a Google Meet invite, show it to a person, send nothing until they say yes, then
+> start the call at the right time and wait for the candidate. The invite would say an AI conducts and transcribes the
+> interview. I have not tested any of it, and whether a candidate has to knock to enter is still an open question.
+> Third, a clearer voice. I compared eight voices by ear, and Senjin now speaks twenty percent slower. Speech
+> recognition mishearing names has been a bigger problem than the candidate hearing Senjin. Fourth, report upload to
+> Drive or Slack, only when a person asks. It is not built, and sharing the file by hand needs no code.
+
+## 10. Limits and takeaways (5:36)
 
 **Visual (SLIDE):** "Advisory only. Local only. Not legal advice." Then three takeaways.
 

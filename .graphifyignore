@@ -1,0 +1,10 @@
+data/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.mp4
+*.wav
+*.mov
+*.onnx
+uv.lock

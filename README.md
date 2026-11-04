@@ -2,6 +2,8 @@
 
 A local AI technical interviewer. It joins a Google Meet, greets the candidate, asks questions drawn from the candidate's resume and the job description, listens, asks follow-ups, answers the candidate's own questions, and then writes an advisory assessment. Everything runs on this Mac: the language models (Ollama), speech recognition (whisper.cpp) and the voice (Piper). There are no cloud model calls in the product path.
 
+**Watch the video: https://youtu.be/-vwdgV50Ewc** (how it works and what broke along the way; the sources are in [docs/video/](docs/video/))
+
 ## How it works
 
 1. **Prepare a candidate folder** under `data/candidates/NAME/` with `resume.md` and `job_description.md`.

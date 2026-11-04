@@ -3,23 +3,26 @@ asks questions drawn from the resume and the job description, listens, follows u
 and writes an advisory report. Local models only (Ollama, whisper.cpp, Piper). A person makes the hiring decision.
 Code and docs: https://github.com/tuwallace/senjin
 
-0:00 A real call
-0:30 What Senjin is
-1:10 Planning from a resume and a job description
-2:10 The call
-3:30 Code asks, the model only phrases
-4:10 The report: quotes it can prove
-5:00 Checking it honestly
-5:45 What went wrong
-6:25 Limits and takeaways
+0:00 What this is
+0:26 What Senjin is
+0:51 Planning from a resume and a job description
+1:33 Inside a call: one reply, start to finish
+2:26 Code asks, the model only phrases
+2:53 The report: quotes it can prove
+3:22 Checking it honestly
+3:48 What went wrong
+4:23 What could come next
+5:36 Limits and takeaways
 
 HOW TO READ THE NUMBERS
 The latency figures (about 2 seconds to first sound, 19 turns) come from one live interview with one human candidate on one
 Mac. The fairness and repeatability checks use a small set of paired transcripts. They are checks, not benchmarks.
 
 ABOUT THIS VIDEO
-- The interviewer's voice is synthetic (Piper). The narration is [your voice / a synthetic voice: edit before upload].
-- The candidate in the demo is the author, who knew an AI would interview them.
+- The opening clip is a re-creation built from the transcript of a real call. The words are real; both voices are synthetic
+  (Senjin's own Piper voice and a macOS voice for the candidate). The rest is narrated slides and an
+  animation. The narration is also a synthetic voice (Kokoro-82M, "am_michael").
+- The candidate in the real call was the author, who knew an AI would interview them.
 - The assessment is advisory only. A person reads the transcript and decides. Rules about automated interviews differ by
   place; this video is not legal advice.
 
